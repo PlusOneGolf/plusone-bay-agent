@@ -1,0 +1,29 @@
+{
+  "name": "plusone-bay-agent",
+  "version": "0.1.0",
+  "description": "PlusOne Bay Agent – fullscreen kiosk overlay for bay PCs",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder --win"
+  },
+  "devDependencies": {
+    "electron": "^30.0.0",
+    "electron-builder": "^24.0.0"
+  },
+  "dependencies": {
+    "socket.io-client": "^4.8.0"
+  },
+  "build": {
+    "appId": "com.plusone.bayagent",
+    "productName": "PlusOne Bay Agent",
+    "win": {
+      "target": "nsis",
+      "icon": null
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": true
+    }
+  }
+}

@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>PlusOne Bay Agent</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      background: #0a0a0a;
+      color: #fff;
+      overflow: hidden;
+      user-select: none;
+      cursor: default;
+    }
+
+    /* ── Status indicator (top-left) ── */
+    .status {
+      position: fixed;
+      top: 16px;
+      left: 16px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(0,0,0,0.7);
+      backdrop-filter: blur(8px);
+      padding: 6px 12px;
+      border-radius: 8px;
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      z-index: 100;
+      border: 1px solid rgba(255,255,255,0.06);
+    }
+    .status-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: #ef4444;
+      transition: background 0.3s;
+    }
+    .status-dot.online { background: #22c55e; }
+    .status-dot.connecting { background: #f59e0b; animation: pulse 1.2s infinite; }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
+    }
+
+    /* ── Timer HUD (top-right) ── */
+    .hud {
+      position: fixed;
+      top: 16px;
+      right: 16px;
+      display: none;
+      align-items: center;
+      gap: 8px;
+      background: rgba(0,0,0,0.7);
+      backdrop-filter: blur(8px);
+      padding: 8px 16px;
+      border-radius: 10px;
+      font-size: 18px;
+      z-index: 100;
+      border: 1px solid rgba(255,255,255,0.06);
+    }
+    .hud-label {
+      color: rgba(255,255,255,0.5);
+      font-size: 13px;
+      font-weight: 500;
+    }
+    .hud-time {
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+      font-family: 'Consolas', 'Segoe UI', monospace;
+      letter-spacing: 0.02em;
+    }
+
+    /* ── Lock screen ── */
+    .lock-screen {
+      position: fixed;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      z-index: 50;
+      background: #0a0a0a;
+    }
+    .lock-icon {
+      width: 72px;
+      height: 72px;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.08);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 24px;
+    }
+    .lock-icon svg {
+      width: 32px;
+      height: 32px;
+      stroke: rgba(255,255,255,0.5);
+      fill: none;
+      stroke-width: 2;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+    .lock-title {
+      font-size: 52px;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      margin-bottom: 8px;
+    }
+    .lock-sub {
+      font-size: 16px;
+      color: rgba(255,255,255,0.5);
+      max-width: 400px;
+      text-align: center;
+      line-height: 1.5;
+    }
+
+    /* ── Config form ── */
+    .config {
+      margin-top: 36px;
+      background: rgba(255,255,255,0.03);
+      border: 1px solid rgba(255,255,255,0.06);
+      border-radius: 12px;
+      padding: 24px;
+      width: 360px;
+    }
+    .config-title {
+      font-size: 13px;
+      font-weight: 600;
+      color: rgba(255,255,255,0.6);
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .config input {
+      width: 100%;
+      padding: 10px 12px;
+      border-radius: 8px;
+      border: 1px solid rgba(255,255,255,0.1);
+      background: rgba(255,255,255,0.04);
+      color: #fff;
+      font-size: 14px;
+      outline: none;
+      margin-bottom: 10px;
+      transition: border-color 0.2s;
+    }
+    .config input:focus {
+      border-color: rgba(255,255,255,0.25);
+    }
+    .config input::placeholder {
+      color: rgba(255,255,255,0.25);
+    }
+    .config button {
+      width: 100%;
+      padding: 10px;
+      border-radius: 8px;
+      border: none;
+      background: #2563eb;
+      color: #fff;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .config button:hover {
+      background: #1d4ed8;
+    }
+    .reconfigure-link {
+      display: inline-block;
+      margin-top: 16px;
+      font-size: 11px;
+      color: rgba(255,255,255,0.15);
+      text-decoration: underline;
+      cursor: pointer;
+      border: none;
+      background: none;
+    }
+
+    /* ── Warning / message overlay ── */
+    .overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.7);
+      backdrop-filter: blur(4px);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 200;
+    }
+    .overlay-box {
+      background: #141414;
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 16px;
+      padding: 32px;
+      max-width: 420px;
+      width: 90%;
+      text-align: center;
+    }
+    .overlay-icon {
+      width: 56px;
+      height: 56px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 16px;
+    }
+    .overlay-icon.warning { background: rgba(245,158,11,0.1); }
+    .overlay-icon.info { background: rgba(37,99,235,0.1); }
+    .overlay-icon svg {
+      width: 28px;
+      height: 28px;
+      fill: none;
+      stroke-width: 2;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+    .overlay-icon.warning svg { stroke: #f59e0b; }
+    .overlay-icon.info svg { stroke: #2563eb; }
+    .overlay-title {
+      font-size: 24px;
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+    .overlay-sub {
+      font-size: 14px;
+      color: rgba(255,255,255,0.6);
+      margin-bottom: 20px;
+      line-height: 1.5;
+    }
+    .overlay-btn {
+      padding: 10px 32px;
+      border-radius: 8px;
+      border: none;
+      background: rgba(255,255,255,0.1);
+      color: #fff;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .overlay-btn:hover {
+      background: rgba(255,255,255,0.15);
+    }
+
+    .hidden { display: none !important; }
+  </style>
+</head>
+<body>
+
+  <!-- Connection status -->
+  <div class="status" id="status">
+    <div class="status-dot" id="statusDot"></div>
+    <span id="statusText">DISCONNECTED</span>
+  </div>
+
+  <!-- Timer HUD (visible when unlocked) -->
+  <div class="hud" id="hud">
+    <span class="hud-label">Time Left</span>
+    <span class="hud-time" id="timeLeft">&mdash;</span>
+  </div>
+
+  <!-- Lock screen -->
+  <div class="lock-screen" id="lockScreen">
+    <div class="lock-icon">
+      <svg viewBox="0 0 24 24">
+        <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+        <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+      </svg>
+    </div>
+    <div class="lock-title">LOCKED</div>
+    <div class="lock-sub" id="lockedMsg">Session inactive. See staff to start your time.</div>
+
+    <!-- Config (shown when not yet configured) -->
+    <div class="config" id="configPanel">
+      <div class="config-title">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+        Bay Configuration
+      </div>
+      <input type="text" id="serverUrl" placeholder="Server URL (e.g. https://your-app.replit.app)" />
+      <input type="text" id="bayId" placeholder="Bay ID (e.g. Bay-1)" />
+      <button id="saveConnect">Save &amp; Connect</button>
+    </div>
+
+    <!-- Reconfigure link (shown after config is saved) -->
+    <button class="reconfigure-link hidden" id="reconfigureBtn">Reconfigure</button>
+  </div>
+
+  <!-- 5-minute warning overlay -->
+  <div class="overlay" id="warnOverlay">
+    <div class="overlay-box">
+      <div class="overlay-icon warning">
+        <svg viewBox="0 0 24 24">
+          <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+          <line x1="12" y1="9" x2="12" y2="13"/>
+          <line x1="12" y1="17" x2="12.01" y2="17"/>
+        </svg>
+      </div>
+      <div class="overlay-title">5 minutes remaining</div>
+      <div class="overlay-sub">Wrap up your hole / finish your swing.</div>
+      <button class="overlay-btn" id="warnOk">OK</button>
+    </div>
+  </div>
+
+  <!-- Staff message overlay -->
+  <div class="overlay" id="msgOverlay">
+    <div class="overlay-box">
+      <div class="overlay-icon info">
+        <svg viewBox="0 0 24 24">
+          <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+        </svg>
+      </div>
+      <div class="overlay-title">Staff Message</div>
+      <div class="overlay-sub" id="msgText"></div>
+      <button class="overlay-btn" id="msgOk">OK</button>
+    </div>
+  </div>
+
+  <script src="renderer.js"></script>
+</body>
+</html>
