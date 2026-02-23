@@ -17,6 +17,13 @@
   "build": {
     "appId": "com.plusone.bayagent",
     "productName": "PlusOne Bay Agent",
+    "files": [
+      "main.js",
+      "renderer.html",
+      "renderer.js",
+      "timer-hud.html",
+      "package.json"
+    ],
     "win": {
       "target": "nsis",
       "icon": null

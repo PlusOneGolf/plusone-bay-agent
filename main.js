@@ -45,8 +45,8 @@ function createWindow() {
 function createTimerWindow() {
   const display = screen.getPrimaryDisplay();
   const screenWidth = display.workAreaSize.width;
-  const hudWidth = 200;
-  const hudHeight = 44;
+  const hudWidth = 220;
+  const hudHeight = 50;
   const xPos = Math.round((screenWidth - hudWidth) / 2);
 
   timerWin = new BrowserWindow({
@@ -56,12 +56,14 @@ function createTimerWindow() {
     y: 12,
     frame: false,
     transparent: true,
+    backgroundColor: "#00000000",
     alwaysOnTop: true,
     skipTaskbar: true,
     focusable: false,
     resizable: false,
     movable: false,
     hasShadow: false,
+    thickFrame: false,
     webPreferences: {
       nodeIntegration: true,
       contextIsolation: false,
@@ -73,6 +75,10 @@ function createTimerWindow() {
   timerWin.setVisibleOnAllWorkspaces(true);
   timerWin.loadFile(path.join(__dirname, "timer-hud.html"));
   timerWin.hide();
+
+  timerWin.webContents.on("did-finish-load", () => {
+    timerWin.webContents.setBackgroundThrottling(false);
+  });
 }
 
 ipcMain.on("overlay:show", () => {
