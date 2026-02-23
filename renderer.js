@@ -27,6 +27,7 @@ let connected    = false;
 let lastServerSeen = 0;
 let pingInterval = null;
 let windowMode   = "kiosk";
+let warnEnabled  = false;
 let notifyMessage = null;
 let notifyTimeout = null;
 
@@ -47,6 +48,7 @@ function doLock() {
   locked = true;
   endsAt = null;
   warned = false;
+  warnEnabled = false;
   notifyMessage = null;
   if (notifyTimeout) { clearTimeout(notifyTimeout); notifyTimeout = null; }
   setWindowMode("kiosk");
@@ -65,12 +67,13 @@ function doUnlock() {
   render();
 }
 
-function doStart(seconds) {
+function doStart(seconds, warn) {
   locked = false;
   notifyMessage = null;
   if (notifyTimeout) { clearTimeout(notifyTimeout); notifyTimeout = null; }
   endsAt = Date.now() + (seconds || 3600) * 1000;
   warned = false;
+  warnEnabled = !!warn;
   setWindowMode("timer");
   render();
 }
@@ -158,7 +161,7 @@ function tick() {
   timerBarValue.className = "timer-value";
   if (msLeft <= 60000) {
     timerBarValue.classList.add("critical");
-  } else if (msLeft <= 5 * 60 * 1000) {
+  } else if (msLeft <= 10 * 60 * 1000) {
     timerBarValue.classList.add("warning");
   }
 
@@ -166,9 +169,10 @@ function tick() {
     notifyTimer.textContent = display;
   }
 
-  if (!warned && msLeft <= 5 * 60 * 1000 && msLeft > 0) {
+  if (warnEnabled && !warned && msLeft <= 10 * 60 * 1000 && msLeft > 0) {
     warned = true;
-    showNotification("\u26A0", "5 minutes remaining", 10000);
+    notifyMessage = { icon: "\u26A0", text: "Time remaining" };
+    setWindowMode("notify");
   }
 
   if (msLeft <= 0) {
@@ -251,14 +255,14 @@ function connect(serverUrl, bayId) {
         break;
 
       case "start":
-        doStart(payload.seconds);
+        doStart(payload.seconds, payload.warn);
         break;
 
       case "extend":
         var extSec = payload.seconds || 900;
         if (endsAt) {
           endsAt += extSec * 1000;
-          if (endsAt - Date.now() > 5 * 60 * 1000) {
+          if (endsAt - Date.now() > 10 * 60 * 1000) {
             warned = false;
           }
         }
