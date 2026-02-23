@@ -30,7 +30,7 @@ function createWindow() {
   win.loadFile(path.join(__dirname, "renderer.html"));
 
   win.on("blur", () => {
-    if (currentMode === "kiosk" || currentMode === "alert") {
+    if (currentMode === "kiosk") {
       win.setAlwaysOnTop(true, "screen-saver");
       win.focus();
     }
@@ -77,21 +77,27 @@ function setTimerBarMode() {
   }, 100);
 }
 
-function setAlertMode() {
+function setNotifyBarMode() {
   if (!win) return;
-  currentMode = "alert";
-  isOverlayVisible = true;
-  win.setIgnoreMouseEvents(false);
-  win.setSkipTaskbar(true);
-
   const display = screen.getPrimaryDisplay();
-  const { width, height } = display.workAreaSize;
-  win.setSize(width, height);
-  win.setPosition(0, 0);
-  win.setAlwaysOnTop(true, "screen-saver");
-  win.setFullScreen(true);
-  win.show();
-  win.focus();
+  const screenWidth = display.workAreaSize.width;
+  const barWidth = 420;
+  const barHeight = 48;
+  const xPos = Math.round((screenWidth - barWidth) / 2);
+
+  currentMode = "notify";
+  isOverlayVisible = true;
+  win.setKiosk(false);
+  win.setFullScreen(false);
+
+  setTimeout(() => {
+    win.setSize(barWidth, barHeight);
+    win.setPosition(xPos, 0);
+    win.setAlwaysOnTop(true, "floating");
+    win.setIgnoreMouseEvents(true);
+    win.setSkipTaskbar(true);
+    win.showInactive();
+  }, 100);
 }
 
 function setHiddenMode() {
@@ -114,8 +120,8 @@ ipcMain.on("window:mode", (event, mode) => {
     case "timer":
       setTimerBarMode();
       break;
-    case "alert":
-      setAlertMode();
+    case "notify":
+      setNotifyBarMode();
       break;
     case "hidden":
       setHiddenMode();

@@ -6,14 +6,13 @@ const hud           = document.getElementById("hud");
 const timeLeftEl    = document.getElementById("timeLeft");
 const timerBar      = document.getElementById("timerBar");
 const timerBarValue = document.getElementById("timerBarValue");
+const notifyBar     = document.getElementById("notifyBar");
+const notifyIcon    = document.getElementById("notifyIcon");
+const notifyText    = document.getElementById("notifyText");
+const notifyTimer   = document.getElementById("notifyTimer");
 const statusEl      = document.getElementById("status");
 const statusDot     = document.getElementById("statusDot");
 const statusText    = document.getElementById("statusText");
-const warnOverlay   = document.getElementById("warnOverlay");
-const warnOk        = document.getElementById("warnOk");
-const msgOverlay    = document.getElementById("msgOverlay");
-const msgText       = document.getElementById("msgText");
-const msgOk         = document.getElementById("msgOk");
 const configPanel   = document.getElementById("configPanel");
 const reconfigBtn   = document.getElementById("reconfigureBtn");
 const serverUrlIn   = document.getElementById("serverUrl");
@@ -28,6 +27,8 @@ let connected    = false;
 let lastServerSeen = 0;
 let pingInterval = null;
 let windowMode   = "kiosk";
+let notifyMessage = null;
+let notifyTimeout = null;
 
 function fmt(ms) {
   if (!ms || ms <= 0) return "0:00";
@@ -42,23 +43,20 @@ function setWindowMode(mode) {
   ipcRenderer.send("window:mode", mode);
 }
 
-function hideOverlays() {
-  warnOverlay.style.display = "none";
-  msgOverlay.style.display = "none";
-}
-
 function doLock() {
   locked = true;
   endsAt = null;
   warned = false;
-  hideOverlays();
+  notifyMessage = null;
+  if (notifyTimeout) { clearTimeout(notifyTimeout); notifyTimeout = null; }
   setWindowMode("kiosk");
   render();
 }
 
 function doUnlock() {
   locked = false;
-  hideOverlays();
+  notifyMessage = null;
+  if (notifyTimeout) { clearTimeout(notifyTimeout); notifyTimeout = null; }
   if (endsAt && endsAt > Date.now()) {
     setWindowMode("timer");
   } else {
@@ -69,11 +67,30 @@ function doUnlock() {
 
 function doStart(seconds) {
   locked = false;
-  hideOverlays();
+  notifyMessage = null;
+  if (notifyTimeout) { clearTimeout(notifyTimeout); notifyTimeout = null; }
   endsAt = Date.now() + (seconds || 3600) * 1000;
   warned = false;
   setWindowMode("timer");
   render();
+}
+
+function showNotification(icon, text, durationMs) {
+  notifyMessage = { icon: icon, text: text };
+  setWindowMode("notify");
+  render();
+
+  if (notifyTimeout) { clearTimeout(notifyTimeout); }
+  notifyTimeout = setTimeout(function () {
+    notifyMessage = null;
+    notifyTimeout = null;
+    if (!locked && endsAt && endsAt > Date.now()) {
+      setWindowMode("timer");
+    } else if (!locked) {
+      setWindowMode("hidden");
+    }
+    render();
+  }, durationMs || 8000);
 }
 
 function render() {
@@ -88,22 +105,29 @@ function render() {
     statusText.textContent = "DISCONNECTED";
   }
 
-  if (windowMode === "timer") {
-    lockScreen.style.display = "none";
-    hud.style.display = "none";
-    statusEl.style.display = "none";
-    timerBar.style.display = "flex";
-  } else {
-    timerBar.style.display = "none";
-    statusEl.style.display = "flex";
+  timerBar.style.display = "none";
+  notifyBar.style.display = "none";
+  lockScreen.style.display = "none";
+  hud.style.display = "none";
+  statusEl.style.display = "none";
 
-    if (locked) {
-      lockScreen.style.display = "flex";
-      hud.style.display = "none";
-    } else {
-      lockScreen.style.display = "none";
-      hud.style.display = "flex";
+  if (windowMode === "timer") {
+    timerBar.style.display = "flex";
+  } else if (windowMode === "notify") {
+    notifyBar.style.display = "flex";
+    if (notifyMessage) {
+      notifyIcon.textContent = notifyMessage.icon;
+      notifyText.textContent = notifyMessage.text;
     }
+    if (endsAt && endsAt > Date.now()) {
+      notifyTimer.textContent = fmt(endsAt - Date.now());
+      notifyTimer.style.display = "";
+    } else {
+      notifyTimer.style.display = "none";
+    }
+  } else if (windowMode === "kiosk") {
+    statusEl.style.display = "flex";
+    lockScreen.style.display = "flex";
   }
 }
 
@@ -120,7 +144,6 @@ function tick() {
   }
 
   if (!endsAt || locked) {
-    timeLeftEl.textContent = "\u2014";
     timerBarValue.textContent = "\u2014";
     timerBarValue.className = "timer-value";
     render();
@@ -129,8 +152,8 @@ function tick() {
 
   const msLeft = endsAt - Date.now();
   const display = fmt(msLeft);
-  timeLeftEl.textContent = display;
   timerBarValue.textContent = display;
+  timeLeftEl.textContent = display;
 
   timerBarValue.className = "timer-value";
   if (msLeft <= 60000) {
@@ -139,10 +162,13 @@ function tick() {
     timerBarValue.classList.add("warning");
   }
 
+  if (windowMode === "notify" && endsAt && endsAt > Date.now()) {
+    notifyTimer.textContent = display;
+  }
+
   if (!warned && msLeft <= 5 * 60 * 1000 && msLeft > 0) {
     warned = true;
-    setWindowMode("alert");
-    warnOverlay.style.display = "flex";
+    showNotification("\u26A0", "5 minutes remaining", 10000);
   }
 
   if (msLeft <= 0) {
@@ -151,25 +177,6 @@ function tick() {
 
   render();
 }
-
-warnOk.addEventListener("click", function () {
-  warnOverlay.style.display = "none";
-  if (!locked && endsAt && endsAt > Date.now()) {
-    setWindowMode("timer");
-    render();
-  }
-});
-
-msgOk.addEventListener("click", function () {
-  msgOverlay.style.display = "none";
-  if (!locked && endsAt && endsAt > Date.now()) {
-    setWindowMode("timer");
-    render();
-  } else if (!locked) {
-    setWindowMode("hidden");
-    render();
-  }
-});
 
 function connect(serverUrl, bayId) {
   if (socket) {
@@ -218,7 +225,7 @@ function connect(serverUrl, bayId) {
     } else {
       locked = false;
       endsAt = state.endsAt || null;
-      hideOverlays();
+      notifyMessage = null;
       if (endsAt && endsAt > Date.now()) {
         setWindowMode("timer");
       } else {
@@ -253,7 +260,6 @@ function connect(serverUrl, bayId) {
           endsAt += extSec * 1000;
           if (endsAt - Date.now() > 5 * 60 * 1000) {
             warned = false;
-            warnOverlay.style.display = "none";
           }
         }
         render();
@@ -264,10 +270,8 @@ function connect(serverUrl, bayId) {
         break;
 
       case "message":
-        msgText.textContent = payload.text || "Message from staff";
-        setWindowMode("alert");
-        msgOverlay.style.display = "flex";
-        render();
+        var msgContent = payload.text || "Message from staff";
+        showNotification("\u2709", msgContent, 15000);
         break;
     }
   });
