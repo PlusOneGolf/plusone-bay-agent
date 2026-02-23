@@ -1,7 +1,8 @@
-const { app, BrowserWindow, globalShortcut } = require("electron");
+const { app, BrowserWindow, globalShortcut, ipcMain } = require("electron");
 const path = require("path");
 
 let win;
+let isOverlayVisible = true;
 
 function createWindow() {
   win = new BrowserWindow({
@@ -28,14 +29,39 @@ function createWindow() {
   win.loadFile(path.join(__dirname, "renderer.html"));
 
   win.on("blur", () => {
-    win.setAlwaysOnTop(true, "screen-saver");
-    win.focus();
+    if (isOverlayVisible) {
+      win.setAlwaysOnTop(true, "screen-saver");
+      win.focus();
+    }
   });
 
   win.on("close", (e) => {
     e.preventDefault();
   });
 }
+
+ipcMain.on("overlay:show", () => {
+  if (win && !isOverlayVisible) {
+    isOverlayVisible = true;
+    win.show();
+    win.setKiosk(true);
+    win.setFullScreen(true);
+    win.setAlwaysOnTop(true, "screen-saver");
+    win.setSkipTaskbar(true);
+    win.focus();
+  }
+});
+
+ipcMain.on("overlay:hide", () => {
+  if (win && isOverlayVisible) {
+    isOverlayVisible = false;
+    win.setAlwaysOnTop(false);
+    win.setKiosk(false);
+    win.setFullScreen(false);
+    win.setSkipTaskbar(false);
+    win.hide();
+  }
+});
 
 app.on("ready", () => {
   createWindow();

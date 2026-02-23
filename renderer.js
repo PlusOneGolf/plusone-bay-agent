@@ -1,6 +1,6 @@
 const { io } = require("socket.io-client");
+const { ipcRenderer } = require("electron");
 
-// ── DOM refs ──
 const lockScreen    = document.getElementById("lockScreen");
 const hud           = document.getElementById("hud");
 const timeLeftEl    = document.getElementById("timeLeft");
@@ -17,7 +17,6 @@ const serverUrlIn   = document.getElementById("serverUrl");
 const bayIdIn       = document.getElementById("bayId");
 const saveBtn       = document.getElementById("saveConnect");
 
-// ── State ──
 let socket       = null;
 let endsAt       = null;
 let locked       = true;
@@ -28,7 +27,6 @@ let pingInterval = null;
 let lastPingSent = 0;
 let missedPings  = 0;
 
-// ── Helpers ──
 function fmt(ms) {
   if (!ms || ms <= 0) return "0:00";
   const s = Math.floor(ms / 1000);
@@ -42,16 +40,29 @@ function hideOverlays() {
   msgOverlay.style.display = "none";
 }
 
+function showOverlayWindow() {
+  ipcRenderer.send("overlay:show");
+}
+
+function hideOverlayWindow() {
+  ipcRenderer.send("overlay:hide");
+}
+
 function doLock() {
   locked = true;
   endsAt = null;
   warned = false;
   hideOverlays();
+  showOverlayWindow();
 }
 
-// ── Render ──
+function doUnlock() {
+  locked = false;
+  hideOverlays();
+  hideOverlayWindow();
+}
+
 function render() {
-  // Connection indicator
   if (connected) {
     statusDot.className = "status-dot online";
     statusText.textContent = "CONNECTED";
@@ -63,7 +74,6 @@ function render() {
     statusText.textContent = "DISCONNECTED";
   }
 
-  // Lock screen vs HUD
   if (locked) {
     lockScreen.style.display = "flex";
     hud.style.display = "none";
@@ -73,15 +83,11 @@ function render() {
   }
 }
 
-// ── Tick (runs every 250ms) ──
 function tick() {
-  // Safety: if disconnected for > 60 seconds, auto-lock
   if (!connected && lastServerSeen > 0 && Date.now() - lastServerSeen > 60000) {
     doLock();
   }
 
-  // Stale connection detection: if we sent pings but got no server
-  // activity for > 45 seconds while "connected", force disconnect
   if (connected && lastServerSeen > 0 && Date.now() - lastServerSeen > 45000) {
     connected = false;
     if (socket) {
@@ -89,7 +95,6 @@ function tick() {
     }
   }
 
-  // Update timer display
   if (!endsAt || locked) {
     timeLeftEl.textContent = "\u2014";
     render();
@@ -99,13 +104,12 @@ function tick() {
   const msLeft = endsAt - Date.now();
   timeLeftEl.textContent = fmt(msLeft);
 
-  // 5-minute warning (show once)
   if (!warned && msLeft <= 5 * 60 * 1000 && msLeft > 0) {
     warned = true;
+    showOverlayWindow();
     warnOverlay.style.display = "flex";
   }
 
-  // Auto-lock at 0:00
   if (msLeft <= 0) {
     doLock();
   }
@@ -113,19 +117,21 @@ function tick() {
   render();
 }
 
-// ── Warning dismiss ──
 warnOk.addEventListener("click", function () {
   warnOverlay.style.display = "none";
+  if (!locked) {
+    hideOverlayWindow();
+  }
 });
 
-// ── Message dismiss ──
 msgOk.addEventListener("click", function () {
   msgOverlay.style.display = "none";
+  if (!locked) {
+    hideOverlayWindow();
+  }
 });
 
-// ── Connect to server ──
 function connect(serverUrl, bayId) {
-  // Clean up previous connection
   if (socket) {
     socket.disconnect();
     socket = null;
@@ -165,12 +171,17 @@ function connect(serverUrl, bayId) {
   socket.on("bay:state", function (state) {
     lastServerSeen = Date.now();
     connected = true;
-    locked = !!state.locked;
-    endsAt = state.endsAt || null;
     warned = false;
-    if (locked) {
+
+    if (!!state.locked) {
+      doLock();
+    } else {
+      locked = false;
+      endsAt = state.endsAt || null;
       hideOverlays();
+      hideOverlayWindow();
     }
+
     render();
   });
 
@@ -186,7 +197,7 @@ function connect(serverUrl, bayId) {
         break;
 
       case "unlock":
-        locked = false;
+        doUnlock();
         break;
 
       case "start":
@@ -195,13 +206,13 @@ function connect(serverUrl, bayId) {
         var seconds = payload.seconds || 3600;
         endsAt = Date.now() + seconds * 1000;
         warned = false;
+        hideOverlayWindow();
         break;
 
       case "extend":
         var extSec = payload.seconds || 900;
         if (endsAt) {
           endsAt += extSec * 1000;
-          // Reset warning if extended past 5 minutes
           if (endsAt - Date.now() > 5 * 60 * 1000) {
             warned = false;
             warnOverlay.style.display = "none";
@@ -215,6 +226,7 @@ function connect(serverUrl, bayId) {
 
       case "message":
         msgText.textContent = payload.text || "Message from staff";
+        showOverlayWindow();
         msgOverlay.style.display = "flex";
         break;
     }
@@ -222,12 +234,10 @@ function connect(serverUrl, bayId) {
     render();
   });
 
-  // Update lastServerSeen on any incoming event (pong, etc.)
   socket.onAny(function () {
     lastServerSeen = Date.now();
   });
 
-  // Send ping every 15 seconds
   pingInterval = setInterval(function () {
     if (socket && socket.connected) {
       socket.emit("bay:ping", { bayId: bayId });
@@ -235,7 +245,6 @@ function connect(serverUrl, bayId) {
   }, 15000);
 }
 
-// ── Load saved config ──
 var savedUrl = localStorage.getItem("serverUrl") || "";
 var savedBayId = localStorage.getItem("bayId") || "";
 serverUrlIn.value = savedUrl;
@@ -247,7 +256,6 @@ if (savedUrl && savedBayId) {
   connect(savedUrl, savedBayId);
 }
 
-// ── Save & Connect button ──
 saveBtn.addEventListener("click", function () {
   var serverUrl = serverUrlIn.value.trim();
   var bayId = bayIdIn.value.trim();
@@ -266,7 +274,6 @@ saveBtn.addEventListener("click", function () {
   connect(serverUrl, bayId);
 });
 
-// ── Reconfigure button ──
 reconfigBtn.addEventListener("click", function () {
   configPanel.classList.remove("hidden");
   reconfigBtn.classList.add("hidden");
@@ -274,6 +281,5 @@ reconfigBtn.addEventListener("click", function () {
   bayIdIn.value = localStorage.getItem("bayId") || "";
 });
 
-// ── Start ticking ──
 render();
 setInterval(tick, 250);
