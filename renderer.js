@@ -48,11 +48,24 @@ function hideOverlayWindow() {
   ipcRenderer.send("overlay:hide");
 }
 
+function showTimerHud() {
+  ipcRenderer.send("timer:show");
+}
+
+function hideTimerHud() {
+  ipcRenderer.send("timer:hide");
+}
+
+function updateTimerHud(msLeft) {
+  ipcRenderer.send("timer:update", { display: fmt(msLeft), msLeft: msLeft });
+}
+
 function doLock() {
   locked = true;
   endsAt = null;
   warned = false;
   hideOverlays();
+  hideTimerHud();
   showOverlayWindow();
 }
 
@@ -103,6 +116,7 @@ function tick() {
 
   const msLeft = endsAt - Date.now();
   timeLeftEl.textContent = fmt(msLeft);
+  updateTimerHud(msLeft);
 
   if (!warned && msLeft <= 5 * 60 * 1000 && msLeft > 0) {
     warned = true;
@@ -180,6 +194,9 @@ function connect(serverUrl, bayId) {
       endsAt = state.endsAt || null;
       hideOverlays();
       hideOverlayWindow();
+      if (endsAt && endsAt > Date.now()) {
+        showTimerHud();
+      }
     }
 
     render();
@@ -207,6 +224,7 @@ function connect(serverUrl, bayId) {
         endsAt = Date.now() + seconds * 1000;
         warned = false;
         hideOverlayWindow();
+        showTimerHud();
         break;
 
       case "extend":

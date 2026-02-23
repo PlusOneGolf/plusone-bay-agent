@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Timer</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: transparent;
+      overflow: hidden;
+      user-select: none;
+      cursor: default;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      -webkit-app-region: no-drag;
+    }
+
+    .timer-pill {
+      background: rgba(0, 0, 0, 0.55);
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 20px;
+      padding: 6px 18px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .timer-label {
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      font-size: 12px;
+      font-weight: 500;
+      color: rgba(255, 255, 255, 0.5);
+      letter-spacing: 0.03em;
+    }
+
+    .timer-value {
+      font-family: 'Consolas', 'Segoe UI', monospace;
+      font-size: 16px;
+      font-weight: 700;
+      color: #fff;
+      font-variant-numeric: tabular-nums;
+      letter-spacing: 0.02em;
+    }
+
+    .timer-value.warning {
+      color: #f59e0b;
+    }
+
+    .timer-value.critical {
+      color: #ef4444;
+      animation: blink 1s infinite;
+    }
+
+    @keyframes blink {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+  </style>
+</head>
+<body>
+  <div class="timer-pill">
+    <span class="timer-label">Time Left</span>
+    <span class="timer-value" id="timerValue">&mdash;</span>
+  </div>
+
+  <script>
+    const { ipcRenderer } = require("electron");
+    const timerValue = document.getElementById("timerValue");
+
+    ipcRenderer.on("timer:update", function (event, data) {
+      timerValue.textContent = data.display;
+      timerValue.className = "timer-value";
+      if (data.msLeft <= 60000) {
+        timerValue.classList.add("critical");
+      } else if (data.msLeft <= 5 * 60 * 1000) {
+        timerValue.classList.add("warning");
+      }
+    });
+  </script>
+</body>
+</html>

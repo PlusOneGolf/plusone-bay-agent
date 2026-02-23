@@ -1,8 +1,10 @@
-const { app, BrowserWindow, globalShortcut, ipcMain } = require("electron");
+const { app, BrowserWindow, globalShortcut, ipcMain, screen } = require("electron");
 const path = require("path");
 
 let win;
+let timerWin;
 let isOverlayVisible = true;
+let isTimerVisible = false;
 
 function createWindow() {
   win = new BrowserWindow({
@@ -40,6 +42,39 @@ function createWindow() {
   });
 }
 
+function createTimerWindow() {
+  const display = screen.getPrimaryDisplay();
+  const screenWidth = display.workAreaSize.width;
+  const hudWidth = 200;
+  const hudHeight = 44;
+  const xPos = Math.round((screenWidth - hudWidth) / 2);
+
+  timerWin = new BrowserWindow({
+    width: hudWidth,
+    height: hudHeight,
+    x: xPos,
+    y: 12,
+    frame: false,
+    transparent: true,
+    alwaysOnTop: true,
+    skipTaskbar: true,
+    focusable: false,
+    resizable: false,
+    movable: false,
+    hasShadow: false,
+    webPreferences: {
+      nodeIntegration: true,
+      contextIsolation: false,
+    },
+  });
+
+  timerWin.setAlwaysOnTop(true, "floating");
+  timerWin.setIgnoreMouseEvents(true);
+  timerWin.setVisibleOnAllWorkspaces(true);
+  timerWin.loadFile(path.join(__dirname, "timer-hud.html"));
+  timerWin.hide();
+}
+
 ipcMain.on("overlay:show", () => {
   if (win && !isOverlayVisible) {
     isOverlayVisible = true;
@@ -63,8 +98,29 @@ ipcMain.on("overlay:hide", () => {
   }
 });
 
+ipcMain.on("timer:show", () => {
+  if (timerWin && !isTimerVisible) {
+    isTimerVisible = true;
+    timerWin.show();
+  }
+});
+
+ipcMain.on("timer:hide", () => {
+  if (timerWin && isTimerVisible) {
+    isTimerVisible = false;
+    timerWin.hide();
+  }
+});
+
+ipcMain.on("timer:update", (event, data) => {
+  if (timerWin && isTimerVisible) {
+    timerWin.webContents.send("timer:update", data);
+  }
+});
+
 app.on("ready", () => {
   createWindow();
+  createTimerWindow();
 
   globalShortcut.register("Alt+F4", () => {});
   globalShortcut.register("CommandOrControl+W", () => {});
@@ -73,6 +129,9 @@ app.on("ready", () => {
   globalShortcut.register("CommandOrControl+Shift+X", () => {
     if (win) {
       win.removeAllListeners("close");
+      if (timerWin) {
+        timerWin.destroy();
+      }
       app.quit();
     }
   });
