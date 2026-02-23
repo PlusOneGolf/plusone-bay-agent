@@ -4,6 +4,9 @@ const { ipcRenderer } = require("electron");
 const lockScreen    = document.getElementById("lockScreen");
 const hud           = document.getElementById("hud");
 const timeLeftEl    = document.getElementById("timeLeft");
+const timerBar      = document.getElementById("timerBar");
+const timerBarValue = document.getElementById("timerBarValue");
+const statusEl      = document.getElementById("status");
 const statusDot     = document.getElementById("statusDot");
 const statusText    = document.getElementById("statusText");
 const warnOverlay   = document.getElementById("warnOverlay");
@@ -24,8 +27,7 @@ let warned       = false;
 let connected    = false;
 let lastServerSeen = 0;
 let pingInterval = null;
-let lastPingSent = 0;
-let missedPings  = 0;
+let windowMode   = "kiosk";
 
 function fmt(ms) {
   if (!ms || ms <= 0) return "0:00";
@@ -35,29 +37,14 @@ function fmt(ms) {
   return m + ":" + String(r).padStart(2, "0");
 }
 
+function setWindowMode(mode) {
+  windowMode = mode;
+  ipcRenderer.send("window:mode", mode);
+}
+
 function hideOverlays() {
   warnOverlay.style.display = "none";
   msgOverlay.style.display = "none";
-}
-
-function showOverlayWindow() {
-  ipcRenderer.send("overlay:show");
-}
-
-function hideOverlayWindow() {
-  ipcRenderer.send("overlay:hide");
-}
-
-function showTimerHud() {
-  ipcRenderer.send("timer:show");
-}
-
-function hideTimerHud() {
-  ipcRenderer.send("timer:hide");
-}
-
-function updateTimerHud(msLeft) {
-  ipcRenderer.send("timer:update", { display: fmt(msLeft), msLeft: msLeft });
 }
 
 function doLock() {
@@ -65,14 +52,28 @@ function doLock() {
   endsAt = null;
   warned = false;
   hideOverlays();
-  hideTimerHud();
-  showOverlayWindow();
+  setWindowMode("kiosk");
+  render();
 }
 
 function doUnlock() {
   locked = false;
   hideOverlays();
-  hideOverlayWindow();
+  if (endsAt && endsAt > Date.now()) {
+    setWindowMode("timer");
+  } else {
+    setWindowMode("hidden");
+  }
+  render();
+}
+
+function doStart(seconds) {
+  locked = false;
+  hideOverlays();
+  endsAt = Date.now() + (seconds || 3600) * 1000;
+  warned = false;
+  setWindowMode("timer");
+  render();
 }
 
 function render() {
@@ -87,12 +88,22 @@ function render() {
     statusText.textContent = "DISCONNECTED";
   }
 
-  if (locked) {
-    lockScreen.style.display = "flex";
-    hud.style.display = "none";
-  } else {
+  if (windowMode === "timer") {
     lockScreen.style.display = "none";
-    hud.style.display = "flex";
+    hud.style.display = "none";
+    statusEl.style.display = "none";
+    timerBar.style.display = "flex";
+  } else {
+    timerBar.style.display = "none";
+    statusEl.style.display = "flex";
+
+    if (locked) {
+      lockScreen.style.display = "flex";
+      hud.style.display = "none";
+    } else {
+      lockScreen.style.display = "none";
+      hud.style.display = "flex";
+    }
   }
 }
 
@@ -110,17 +121,27 @@ function tick() {
 
   if (!endsAt || locked) {
     timeLeftEl.textContent = "\u2014";
+    timerBarValue.textContent = "\u2014";
+    timerBarValue.className = "timer-value";
     render();
     return;
   }
 
   const msLeft = endsAt - Date.now();
-  timeLeftEl.textContent = fmt(msLeft);
-  updateTimerHud(msLeft);
+  const display = fmt(msLeft);
+  timeLeftEl.textContent = display;
+  timerBarValue.textContent = display;
+
+  timerBarValue.className = "timer-value";
+  if (msLeft <= 60000) {
+    timerBarValue.classList.add("critical");
+  } else if (msLeft <= 5 * 60 * 1000) {
+    timerBarValue.classList.add("warning");
+  }
 
   if (!warned && msLeft <= 5 * 60 * 1000 && msLeft > 0) {
     warned = true;
-    showOverlayWindow();
+    setWindowMode("alert");
     warnOverlay.style.display = "flex";
   }
 
@@ -133,15 +154,20 @@ function tick() {
 
 warnOk.addEventListener("click", function () {
   warnOverlay.style.display = "none";
-  if (!locked) {
-    hideOverlayWindow();
+  if (!locked && endsAt && endsAt > Date.now()) {
+    setWindowMode("timer");
+    render();
   }
 });
 
 msgOk.addEventListener("click", function () {
   msgOverlay.style.display = "none";
-  if (!locked) {
-    hideOverlayWindow();
+  if (!locked && endsAt && endsAt > Date.now()) {
+    setWindowMode("timer");
+    render();
+  } else if (!locked) {
+    setWindowMode("hidden");
+    render();
   }
 });
 
@@ -193,13 +219,13 @@ function connect(serverUrl, bayId) {
       locked = false;
       endsAt = state.endsAt || null;
       hideOverlays();
-      hideOverlayWindow();
       if (endsAt && endsAt > Date.now()) {
-        showTimerHud();
+        setWindowMode("timer");
+      } else {
+        setWindowMode("hidden");
       }
+      render();
     }
-
-    render();
   });
 
   socket.on("bay:command", function (data) {
@@ -218,13 +244,7 @@ function connect(serverUrl, bayId) {
         break;
 
       case "start":
-        locked = false;
-        hideOverlays();
-        var seconds = payload.seconds || 3600;
-        endsAt = Date.now() + seconds * 1000;
-        warned = false;
-        hideOverlayWindow();
-        showTimerHud();
+        doStart(payload.seconds);
         break;
 
       case "extend":
@@ -236,6 +256,7 @@ function connect(serverUrl, bayId) {
             warnOverlay.style.display = "none";
           }
         }
+        render();
         break;
 
       case "end":
@@ -244,12 +265,11 @@ function connect(serverUrl, bayId) {
 
       case "message":
         msgText.textContent = payload.text || "Message from staff";
-        showOverlayWindow();
+        setWindowMode("alert");
         msgOverlay.style.display = "flex";
+        render();
         break;
     }
-
-    render();
   });
 
   socket.onAny(function () {

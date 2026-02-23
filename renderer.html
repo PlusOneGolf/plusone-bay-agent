@@ -15,7 +15,7 @@
       cursor: default;
     }
 
-    /* ── Status indicator (top-left) ── */
+    /* ── Status indicator (top-left, only visible in kiosk/alert mode) ── */
     .status {
       position: fixed;
       top: 16px;
@@ -48,7 +48,47 @@
       50% { opacity: 0.4; }
     }
 
-    /* ── Timer HUD (top-right) ── */
+    /* ── Timer bar (shown when window is in timer-bar mode) ── */
+    .timer-bar {
+      display: none;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      width: 100%;
+      height: 100%;
+      position: fixed;
+      inset: 0;
+      background: #1a1a1a;
+      z-index: 300;
+    }
+    .timer-bar .timer-label {
+      font-size: 13px;
+      font-weight: 500;
+      color: rgba(255,255,255,0.45);
+      letter-spacing: 0.03em;
+    }
+    .timer-bar .timer-value {
+      font-family: 'Consolas', 'Segoe UI', monospace;
+      font-size: 18px;
+      font-weight: 700;
+      color: #fff;
+      font-variant-numeric: tabular-nums;
+      letter-spacing: 0.02em;
+    }
+    .timer-bar .timer-value.warning {
+      color: #f59e0b;
+    }
+    .timer-bar .timer-value.critical {
+      color: #ef4444;
+      animation: blink 1s infinite;
+    }
+
+    @keyframes blink {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+
+    /* ── Timer HUD (top-right, visible in kiosk mode when timer running) ── */
     .hud {
       position: fixed;
       top: 16px;
@@ -261,7 +301,13 @@
     <span id="statusText">DISCONNECTED</span>
   </div>
 
-  <!-- Timer HUD (visible when unlocked) -->
+  <!-- Timer bar (fills the small window when in timer-bar mode) -->
+  <div class="timer-bar" id="timerBar">
+    <span class="timer-label">Time Left</span>
+    <span class="timer-value" id="timerBarValue">&mdash;</span>
+  </div>
+
+  <!-- Timer HUD (visible in full-screen mode) -->
   <div class="hud" id="hud">
     <span class="hud-label">Time Left</span>
     <span class="hud-time" id="timeLeft">&mdash;</span>

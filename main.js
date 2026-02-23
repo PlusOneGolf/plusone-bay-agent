@@ -1,13 +1,9 @@
 const { app, BrowserWindow, globalShortcut, ipcMain, screen } = require("electron");
 const path = require("path");
 
-app.disableHardwareAcceleration();
-
 let win;
-let timerWin;
 let isOverlayVisible = true;
-let isTimerVisible = false;
-let timerReady = false;
+let currentMode = "kiosk";
 
 function createWindow() {
   win = new BrowserWindow({
@@ -34,7 +30,7 @@ function createWindow() {
   win.loadFile(path.join(__dirname, "renderer.html"));
 
   win.on("blur", () => {
-    if (isOverlayVisible) {
+    if (currentMode === "kiosk" || currentMode === "alert") {
       win.setAlwaysOnTop(true, "screen-saver");
       win.focus();
     }
@@ -45,97 +41,90 @@ function createWindow() {
   });
 }
 
-function createTimerWindow() {
+function setKioskMode() {
+  if (!win) return;
+  currentMode = "kiosk";
+  isOverlayVisible = true;
+  win.setIgnoreMouseEvents(false);
+  win.setSkipTaskbar(true);
+  win.setAlwaysOnTop(true, "screen-saver");
+  win.setKiosk(true);
+  win.setFullScreen(true);
+  win.show();
+  win.focus();
+}
+
+function setTimerBarMode() {
+  if (!win) return;
   const display = screen.getPrimaryDisplay();
   const screenWidth = display.workAreaSize.width;
-  const hudWidth = 240;
-  const hudHeight = 48;
-  const xPos = Math.round((screenWidth - hudWidth) / 2);
+  const barWidth = 240;
+  const barHeight = 48;
+  const xPos = Math.round((screenWidth - barWidth) / 2);
 
-  timerWin = new BrowserWindow({
-    width: hudWidth,
-    height: hudHeight,
-    x: xPos,
-    y: 0,
-    frame: false,
-    alwaysOnTop: true,
-    skipTaskbar: true,
-    focusable: false,
-    resizable: false,
-    movable: false,
-    hasShadow: false,
-    show: false,
-    webPreferences: {
-      nodeIntegration: true,
-      contextIsolation: false,
-    },
-  });
+  currentMode = "timer";
+  isOverlayVisible = true;
+  win.setKiosk(false);
+  win.setFullScreen(false);
 
-  timerWin.setAlwaysOnTop(true, "floating");
-  timerWin.setIgnoreMouseEvents(true);
-  timerWin.setVisibleOnAllWorkspaces(true);
-  timerWin.loadFile(path.join(__dirname, "timer-hud.html"));
-
-  timerWin.webContents.on("did-finish-load", () => {
-    timerReady = true;
-    timerWin.webContents.setBackgroundThrottling(false);
-  });
-}
-
-function showTimer() {
-  if (timerWin && !isTimerVisible && timerReady) {
-    isTimerVisible = true;
-    timerWin.showInactive();
-  }
-}
-
-function hideTimer() {
-  if (timerWin && isTimerVisible) {
-    isTimerVisible = false;
-    timerWin.hide();
-  }
-}
-
-ipcMain.on("overlay:show", () => {
-  if (win && !isOverlayVisible) {
-    isOverlayVisible = true;
-    win.show();
-    win.setKiosk(true);
-    win.setFullScreen(true);
-    win.setAlwaysOnTop(true, "screen-saver");
+  setTimeout(() => {
+    win.setSize(barWidth, barHeight);
+    win.setPosition(xPos, 0);
+    win.setAlwaysOnTop(true, "floating");
+    win.setIgnoreMouseEvents(true);
     win.setSkipTaskbar(true);
-    win.focus();
-  }
-});
+    win.showInactive();
+  }, 100);
+}
 
-ipcMain.on("overlay:hide", () => {
-  if (win && isOverlayVisible) {
-    isOverlayVisible = false;
-    win.setAlwaysOnTop(false);
-    win.setKiosk(false);
-    win.setFullScreen(false);
-    win.setSkipTaskbar(false);
-    win.hide();
-  }
-});
+function setAlertMode() {
+  if (!win) return;
+  currentMode = "alert";
+  isOverlayVisible = true;
+  win.setIgnoreMouseEvents(false);
+  win.setSkipTaskbar(true);
 
-ipcMain.on("timer:show", () => {
-  showTimer();
-});
+  const display = screen.getPrimaryDisplay();
+  const { width, height } = display.workAreaSize;
+  win.setSize(width, height);
+  win.setPosition(0, 0);
+  win.setAlwaysOnTop(true, "screen-saver");
+  win.setFullScreen(true);
+  win.show();
+  win.focus();
+}
 
-ipcMain.on("timer:hide", () => {
-  hideTimer();
-});
+function setHiddenMode() {
+  if (!win) return;
+  currentMode = "hidden";
+  isOverlayVisible = false;
+  win.setIgnoreMouseEvents(false);
+  win.setAlwaysOnTop(false);
+  win.setKiosk(false);
+  win.setFullScreen(false);
+  win.setSkipTaskbar(false);
+  win.hide();
+}
 
-ipcMain.on("timer:update", (event, data) => {
-  if (timerWin && isTimerVisible) {
-    timerWin.webContents.send("timer:update", data);
+ipcMain.on("window:mode", (event, mode) => {
+  switch (mode) {
+    case "kiosk":
+      setKioskMode();
+      break;
+    case "timer":
+      setTimerBarMode();
+      break;
+    case "alert":
+      setAlertMode();
+      break;
+    case "hidden":
+      setHiddenMode();
+      break;
   }
 });
 
 app.on("ready", () => {
   createWindow();
-  createTimerWindow();
 
   globalShortcut.register("Alt+F4", () => {});
   globalShortcut.register("CommandOrControl+W", () => {});
@@ -144,9 +133,6 @@ app.on("ready", () => {
   globalShortcut.register("CommandOrControl+Shift+X", () => {
     if (win) {
       win.removeAllListeners("close");
-      if (timerWin) {
-        timerWin.destroy();
-      }
       app.quit();
     }
   });
