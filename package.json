@@ -21,7 +21,7 @@
       "main.js",
       "renderer.html",
       "renderer.js",
-      "timer-hud.html",
+      "logo.png",
       "package.json"
     ],
     "win": {

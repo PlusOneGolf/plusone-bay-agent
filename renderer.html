@@ -161,25 +161,12 @@
       z-index: 50;
       background: #0a0a0a;
     }
-    .lock-icon {
-      width: 72px;
-      height: 72px;
-      border-radius: 50%;
-      background: rgba(255,255,255,0.04);
-      border: 1px solid rgba(255,255,255,0.08);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      margin-bottom: 24px;
+    .lock-logo {
+      margin-bottom: 32px;
     }
-    .lock-icon svg {
-      width: 32px;
-      height: 32px;
-      stroke: rgba(255,255,255,0.5);
-      fill: none;
-      stroke-width: 2;
-      stroke-linecap: round;
-      stroke-linejoin: round;
+    .lock-logo img {
+      height: 100px;
+      width: auto;
     }
     .lock-title {
       font-size: 52px;
@@ -283,11 +270,8 @@
 
   <!-- Lock screen -->
   <div class="lock-screen" id="lockScreen">
-    <div class="lock-icon">
-      <svg viewBox="0 0 24 24">
-        <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
-        <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
-      </svg>
+    <div class="lock-logo">
+      <img src="logo.png" alt="The Bogey Factory" />
     </div>
     <div class="lock-title">LOCKED</div>
     <div class="lock-sub" id="lockedMsg">Session inactive. See staff to start your time.</div>
