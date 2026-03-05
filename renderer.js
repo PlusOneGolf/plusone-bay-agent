@@ -135,17 +135,6 @@ function render() {
 }
 
 function tick() {
-  if (!connected && lastServerSeen > 0 && Date.now() - lastServerSeen > 60000) {
-    doLock();
-  }
-
-  if (connected && lastServerSeen > 0 && Date.now() - lastServerSeen > 45000) {
-    connected = false;
-    if (socket) {
-      socket.disconnect();
-    }
-  }
-
   if (!endsAt || locked) {
     timerBarValue.textContent = "\u2014";
     timerBarValue.className = "timer-value";
@@ -173,10 +162,6 @@ function tick() {
     warned = true;
     notifyMessage = { icon: "\u26A0", text: "Time remaining" };
     setWindowMode("notify");
-  }
-
-  if (msLeft <= 0) {
-    doLock();
   }
 
   render();
