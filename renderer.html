@@ -238,6 +238,31 @@
       background: none;
     }
 
+    .pin-dots {
+      display: flex;
+      gap: 8px;
+      margin-top: 24px;
+      opacity: 0;
+      transition: opacity 0.3s;
+    }
+    .pin-dots.active { opacity: 1; }
+    .pin-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      border: 1px solid rgba(255,255,255,0.2);
+      background: transparent;
+      transition: background 0.15s, border-color 0.15s;
+    }
+    .pin-dot.filled {
+      background: #fff;
+      border-color: #fff;
+    }
+    .pin-dot.error {
+      background: #ef4444;
+      border-color: #ef4444;
+    }
+
     .hidden { display: none !important; }
   </style>
 </head>
@@ -275,6 +300,13 @@
     </div>
     <div class="lock-title">LOCKED</div>
     <div class="lock-sub" id="lockedMsg">Your Session Has Ended</div>
+
+    <div class="pin-dots" id="pinDots">
+      <div class="pin-dot" id="pinDot0"></div>
+      <div class="pin-dot" id="pinDot1"></div>
+      <div class="pin-dot" id="pinDot2"></div>
+      <div class="pin-dot" id="pinDot3"></div>
+    </div>
 
     <div class="config" id="configPanel">
       <div class="config-title">

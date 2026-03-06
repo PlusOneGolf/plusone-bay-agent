@@ -31,6 +31,60 @@ let warnEnabled  = false;
 let notifyMessage = null;
 let notifyTimeout = null;
 
+const UNLOCK_PIN = "7748";
+let pinBuffer = "";
+let pinTimer = null;
+const pinDotsEl = document.getElementById("pinDots");
+const pinDots = [
+  document.getElementById("pinDot0"),
+  document.getElementById("pinDot1"),
+  document.getElementById("pinDot2"),
+  document.getElementById("pinDot3"),
+];
+
+function resetPin() {
+  pinBuffer = "";
+  pinDotsEl.classList.remove("active");
+  pinDots.forEach(function (dot) {
+    dot.className = "pin-dot";
+  });
+  if (pinTimer) { clearTimeout(pinTimer); pinTimer = null; }
+}
+
+function updatePinDots() {
+  pinDotsEl.classList.add("active");
+  pinDots.forEach(function (dot, i) {
+    dot.className = i < pinBuffer.length ? "pin-dot filled" : "pin-dot";
+  });
+}
+
+function showPinError() {
+  pinDots.forEach(function (dot) {
+    dot.className = "pin-dot error";
+  });
+  setTimeout(resetPin, 600);
+}
+
+document.addEventListener("keydown", function (e) {
+  if (!locked || windowMode !== "kiosk") return;
+  if (e.key >= "0" && e.key <= "9") {
+    pinBuffer += e.key;
+    updatePinDots();
+
+    if (pinTimer) clearTimeout(pinTimer);
+    pinTimer = setTimeout(resetPin, 5000);
+
+    if (pinBuffer.length === 4) {
+      if (pinBuffer === UNLOCK_PIN) {
+        resetPin();
+        doUnlock();
+      } else {
+        showPinError();
+      }
+    }
+  }
+});
+
 function fmt(ms) {
   if (!ms || ms <= 0) return "0:00";
   const s = Math.floor(ms / 1000);
