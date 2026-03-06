@@ -276,18 +276,20 @@ function connect(serverUrl, bayId) {
   }, 15000);
 }
 
-var savedUrl = localStorage.getItem("serverUrl") || "";
-var savedBayId = localStorage.getItem("bayId") || "";
-serverUrlIn.value = savedUrl;
-bayIdIn.value = savedBayId;
+var savedConfig = null;
 
-if (savedUrl && savedBayId) {
-  configPanel.classList.add("hidden");
-  reconfigBtn.classList.remove("hidden");
-  connect(savedUrl, savedBayId);
+async function initConfig() {
+  savedConfig = await ipcRenderer.invoke("config:load");
+  if (savedConfig && savedConfig.serverUrl && savedConfig.bayId) {
+    serverUrlIn.value = savedConfig.serverUrl;
+    bayIdIn.value = savedConfig.bayId;
+    configPanel.classList.add("hidden");
+    reconfigBtn.classList.remove("hidden");
+    connect(savedConfig.serverUrl, savedConfig.bayId);
+  }
 }
 
-saveBtn.addEventListener("click", function () {
+saveBtn.addEventListener("click", async function () {
   var serverUrl = serverUrlIn.value.trim();
   var bayId = bayIdIn.value.trim();
 
@@ -297,8 +299,8 @@ saveBtn.addEventListener("click", function () {
     return;
   }
 
-  localStorage.setItem("serverUrl", serverUrl);
-  localStorage.setItem("bayId", bayId);
+  await ipcRenderer.invoke("config:save", { serverUrl: serverUrl, bayId: bayId });
+  savedConfig = { serverUrl: serverUrl, bayId: bayId };
 
   configPanel.classList.add("hidden");
   reconfigBtn.classList.remove("hidden");
@@ -308,9 +310,13 @@ saveBtn.addEventListener("click", function () {
 reconfigBtn.addEventListener("click", function () {
   configPanel.classList.remove("hidden");
   reconfigBtn.classList.add("hidden");
-  serverUrlIn.value = localStorage.getItem("serverUrl") || "";
-  bayIdIn.value = localStorage.getItem("bayId") || "";
+  if (savedConfig) {
+    serverUrlIn.value = savedConfig.serverUrl || "";
+    bayIdIn.value = savedConfig.bayId || "";
+  }
 });
+
+initConfig();
 
 render();
 setInterval(tick, 250);

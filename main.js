@@ -1,5 +1,32 @@
 const { app, BrowserWindow, globalShortcut, ipcMain, screen } = require("electron");
 const path = require("path");
+const fs = require("fs");
+
+function getConfigPath() {
+  return path.join(app.getPath("userData"), "bay-config.json");
+}
+
+function loadConfig() {
+  try {
+    const data = fs.readFileSync(getConfigPath(), "utf-8");
+    return JSON.parse(data);
+  } catch (e) {
+    return null;
+  }
+}
+
+function saveConfig(config) {
+  fs.writeFileSync(getConfigPath(), JSON.stringify(config), "utf-8");
+}
+
+ipcMain.handle("config:load", () => {
+  return loadConfig();
+});
+
+ipcMain.handle("config:save", (event, config) => {
+  saveConfig(config);
+  return true;
+});
 
 let win;
 let isOverlayVisible = true;
