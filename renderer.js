@@ -28,6 +28,7 @@ let lastServerSeen = 0;
 let pingInterval = null;
 let windowMode   = "kiosk";
 let warnEnabled  = false;
+let pinUnlocked  = false;
 let notifyMessage = null;
 let notifyTimeout = null;
 
@@ -77,7 +78,11 @@ document.addEventListener("keydown", function (e) {
     if (pinBuffer.length === 4) {
       if (pinBuffer === UNLOCK_PIN) {
         resetPin();
+        pinUnlocked = true;
         doUnlock();
+        if (socket && socket.connected) {
+          socket.emit("bay:pin-unlock", { bayId: savedConfig ? savedConfig.bayId : "" });
+        }
       } else {
         showPinError();
       }
@@ -263,6 +268,9 @@ function connect(serverUrl, bayId) {
     connected = true;
     warned = false;
 
+    if (!!state.locked && pinUnlocked) {
+      return;
+    }
     if (!!state.locked) {
       doLock();
     } else {
@@ -286,6 +294,7 @@ function connect(serverUrl, bayId) {
 
     switch (cmd) {
       case "lock":
+        pinUnlocked = false;
         doLock();
         break;
 
@@ -309,6 +318,7 @@ function connect(serverUrl, bayId) {
         break;
 
       case "end":
+        pinUnlocked = false;
         doLock();
         break;
 
