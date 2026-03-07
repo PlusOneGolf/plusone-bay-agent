@@ -247,7 +247,7 @@ function connect(serverUrl, bayId) {
   socket.on("connect", function () {
     connected = true;
     lastServerSeen = Date.now();
-    socket.emit("bay:hello", { bayId: bayId });
+    socket.emit("bay:hello", { bayId: bayId, locked: locked });
     render();
   });
 
@@ -259,7 +259,7 @@ function connect(serverUrl, bayId) {
   socket.on("reconnect", function () {
     connected = true;
     lastServerSeen = Date.now();
-    socket.emit("bay:hello", { bayId: bayId });
+    socket.emit("bay:hello", { bayId: bayId, locked: locked });
     render();
   });
 
