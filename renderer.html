@@ -182,9 +182,75 @@
       line-height: 1.5;
     }
 
+    /* ── Next reservation block ── */
+    .next-reservation {
+      margin-top: 28px;
+      padding: 16px 24px;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 12px;
+      text-align: center;
+      max-width: 400px;
+    }
+    .next-reservation-label {
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      color: rgba(255,255,255,0.35);
+      text-transform: uppercase;
+      margin-bottom: 6px;
+    }
+    .next-reservation-name {
+      font-size: 18px;
+      font-weight: 700;
+      color: #fff;
+      margin-bottom: 4px;
+    }
+    .next-reservation-time {
+      font-size: 14px;
+      color: rgba(255,255,255,0.5);
+    }
+
+    /* ── PIN dots ── */
+    .pin-dots {
+      display: flex;
+      gap: 8px;
+      margin-top: 24px;
+      opacity: 0;
+      transition: opacity 0.3s;
+    }
+    .pin-dots.active { opacity: 1; }
+    .pin-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      border: 1px solid rgba(255,255,255,0.2);
+      background: transparent;
+      transition: background 0.15s, border-color 0.15s;
+    }
+    .pin-dot.filled {
+      background: #fff;
+      border-color: #fff;
+    }
+    .pin-dot.error {
+      background: #ef4444;
+      border-color: #ef4444;
+    }
+
+    .pin-error-msg {
+      font-size: 12px;
+      color: #ef4444;
+      margin-top: 10px;
+      min-height: 18px;
+      text-align: center;
+      opacity: 0;
+      transition: opacity 0.2s;
+    }
+    .pin-error-msg.visible { opacity: 1; }
+
     /* ── Config form ── */
     .config {
-      margin-top: 36px;
+      margin-top: 28px;
       background: rgba(255,255,255,0.03);
       border: 1px solid rgba(255,255,255,0.06);
       border-radius: 12px;
@@ -238,31 +304,6 @@
       background: none;
     }
 
-    .pin-dots {
-      display: flex;
-      gap: 8px;
-      margin-top: 24px;
-      opacity: 0;
-      transition: opacity 0.3s;
-    }
-    .pin-dots.active { opacity: 1; }
-    .pin-dot {
-      width: 10px;
-      height: 10px;
-      border-radius: 50%;
-      border: 1px solid rgba(255,255,255,0.2);
-      background: transparent;
-      transition: background 0.15s, border-color 0.15s;
-    }
-    .pin-dot.filled {
-      background: #fff;
-      border-color: #fff;
-    }
-    .pin-dot.error {
-      background: #ef4444;
-      border-color: #ef4444;
-    }
-
     .hidden { display: none !important; }
   </style>
 </head>
@@ -301,12 +342,21 @@
     <div class="lock-title">LOCKED</div>
     <div class="lock-sub" id="lockedMsg">Your Session Has Ended</div>
 
+    <!-- Next reservation (shown when server provides it) -->
+    <div class="next-reservation hidden" id="nextReservation">
+      <div class="next-reservation-label">Up Next</div>
+      <div class="next-reservation-name" id="nextResName"></div>
+      <div class="next-reservation-time" id="nextResTime"></div>
+    </div>
+
+    <!-- PIN entry dots -->
     <div class="pin-dots" id="pinDots">
       <div class="pin-dot" id="pinDot0"></div>
       <div class="pin-dot" id="pinDot1"></div>
       <div class="pin-dot" id="pinDot2"></div>
       <div class="pin-dot" id="pinDot3"></div>
     </div>
+    <div class="pin-error-msg" id="pinErrorMsg">Incorrect code, please try again</div>
 
     <div class="config" id="configPanel">
       <div class="config-title">
@@ -314,7 +364,8 @@
         Bay Configuration
       </div>
       <input type="text" id="serverUrl" placeholder="Server URL (e.g. https://your-app.replit.app)" />
-      <input type="text" id="bayId" placeholder="Bay ID (e.g. Bay-1)" />
+      <input type="text" id="bayName" placeholder="Bay Name (e.g. Bay-1)" />
+      <input type="text" id="facilityId" placeholder="Facility ID (e.g. 2)" />
       <button id="saveConnect">Save &amp; Connect</button>
     </div>
 

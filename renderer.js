@@ -1,41 +1,47 @@
 const { io } = require("socket.io-client");
 const { ipcRenderer } = require("electron");
 
-const lockScreen    = document.getElementById("lockScreen");
-const hud           = document.getElementById("hud");
-const timeLeftEl    = document.getElementById("timeLeft");
-const timerBar      = document.getElementById("timerBar");
-const timerBarValue = document.getElementById("timerBarValue");
-const notifyBar     = document.getElementById("notifyBar");
-const notifyIcon    = document.getElementById("notifyIcon");
-const notifyText    = document.getElementById("notifyText");
-const notifyTimer   = document.getElementById("notifyTimer");
-const statusEl      = document.getElementById("status");
-const statusDot     = document.getElementById("statusDot");
-const statusText    = document.getElementById("statusText");
-const configPanel   = document.getElementById("configPanel");
-const reconfigBtn   = document.getElementById("reconfigureBtn");
-const serverUrlIn   = document.getElementById("serverUrl");
-const bayIdIn       = document.getElementById("bayId");
-const saveBtn       = document.getElementById("saveConnect");
+const lockScreen      = document.getElementById("lockScreen");
+const hud             = document.getElementById("hud");
+const timeLeftEl      = document.getElementById("timeLeft");
+const timerBar        = document.getElementById("timerBar");
+const timerBarValue   = document.getElementById("timerBarValue");
+const notifyBar       = document.getElementById("notifyBar");
+const notifyIcon      = document.getElementById("notifyIcon");
+const notifyText      = document.getElementById("notifyText");
+const notifyTimer     = document.getElementById("notifyTimer");
+const statusEl        = document.getElementById("status");
+const statusDot       = document.getElementById("statusDot");
+const statusText      = document.getElementById("statusText");
+const configPanel     = document.getElementById("configPanel");
+const reconfigBtn     = document.getElementById("reconfigureBtn");
+const serverUrlIn     = document.getElementById("serverUrl");
+const bayNameIn       = document.getElementById("bayName");
+const facilityIdIn    = document.getElementById("facilityId");
+const saveBtn         = document.getElementById("saveConnect");
+const nextReservation = document.getElementById("nextReservation");
+const nextResName     = document.getElementById("nextResName");
+const nextResTime     = document.getElementById("nextResTime");
 
-let socket       = null;
-let endsAt       = null;
-let locked       = true;
-let warned       = false;
-let connected    = false;
-let lastServerSeen = 0;
-let pingInterval = null;
-let windowMode   = "kiosk";
-let warnEnabled  = false;
-let pinUnlocked  = false;
-let notifyMessage = null;
-let notifyTimeout = null;
+let socket             = null;
+let endsAt             = null;
+let locked             = true;
+let warned             = false;
+let connected          = false;
+let lastServerSeen     = 0;
+let pingInterval       = null;
+let windowMode         = "kiosk";
+let warnEnabled        = false;
+let pinUnlocked        = false;
+let disconnectBehavior = null;
+let notifyMessage      = null;
+let notifyTimeout      = null;
 
-const UNLOCK_PIN = "7748";
+const STAFF_PIN = "7748";
 let pinBuffer = "";
-let pinTimer = null;
-const pinDotsEl = document.getElementById("pinDots");
+let pinTimer  = null;
+const pinDotsEl    = document.getElementById("pinDots");
+const pinErrorMsgEl = document.getElementById("pinErrorMsg");
 const pinDots = [
   document.getElementById("pinDot0"),
   document.getElementById("pinDot1"),
@@ -46,9 +52,7 @@ const pinDots = [
 function resetPin() {
   pinBuffer = "";
   pinDotsEl.classList.remove("active");
-  pinDots.forEach(function (dot) {
-    dot.className = "pin-dot";
-  });
+  pinDots.forEach(function (dot) { dot.className = "pin-dot"; });
   if (pinTimer) { clearTimeout(pinTimer); pinTimer = null; }
 }
 
@@ -59,11 +63,14 @@ function updatePinDots() {
   });
 }
 
-function showPinError() {
-  pinDots.forEach(function (dot) {
-    dot.className = "pin-dot error";
-  });
-  setTimeout(resetPin, 600);
+function showPinError(msg) {
+  pinDots.forEach(function (dot) { dot.className = "pin-dot error"; });
+  if (msg) {
+    pinErrorMsgEl.textContent = msg;
+    pinErrorMsgEl.classList.add("visible");
+    setTimeout(function () { pinErrorMsgEl.classList.remove("visible"); }, 3000);
+  }
+  setTimeout(resetPin, 800);
 }
 
 document.addEventListener("keydown", function (e) {
@@ -76,21 +83,27 @@ document.addEventListener("keydown", function (e) {
     pinTimer = setTimeout(resetPin, 5000);
 
     if (pinBuffer.length === 4) {
-      if (pinBuffer === UNLOCK_PIN) {
-        resetPin();
+      var entered = pinBuffer;
+      resetPin();
+
+      if (entered === STAFF_PIN) {
         pinUnlocked = true;
         doUnlock();
         if (socket && socket.connected) {
-          socket.emit("bay:pin-unlock", { bayId: savedConfig ? savedConfig.bayId : "" });
+          socket.emit("bay:state", { locked: false });
         }
       } else {
-        showPinError();
+        if (socket && socket.connected) {
+          socket.emit("bay:pin-unlock", { pin: entered });
+        } else {
+          showPinError("Incorrect code, please try again");
+        }
       }
     }
   }
 });
 
-function fmt(ms) {
+function fmtMs(ms) {
   if (!ms || ms <= 0) return "0:00";
   const s = Math.floor(ms / 1000);
   const m = Math.floor(s / 60);
@@ -98,25 +111,49 @@ function fmt(ms) {
   return m + ":" + String(r).padStart(2, "0");
 }
 
+function fmtLocalTime(isoStr) {
+  if (!isoStr) return "";
+  var d = new Date(isoStr);
+  return d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+}
+
 function setWindowMode(mode) {
   windowMode = mode;
   ipcRenderer.send("window:mode", mode);
 }
 
-function doLock() {
-  locked = true;
-  endsAt = null;
-  warned = false;
+function showNextReservation(res) {
+  if (res) {
+    nextResName.textContent = res.name || "Guest";
+    var start = fmtLocalTime(res.startTime);
+    var end   = fmtLocalTime(res.endTime);
+    nextResTime.textContent = start && end ? start + " \u2013 " + end : "";
+    nextReservation.classList.remove("hidden");
+  } else {
+    nextReservation.classList.add("hidden");
+  }
+}
+
+function doLock(opts) {
+  locked    = true;
+  endsAt    = null;
+  warned    = false;
   warnEnabled = false;
+  pinUnlocked = false;
   notifyMessage = null;
   if (notifyTimeout) { clearTimeout(notifyTimeout); notifyTimeout = null; }
+  showNextReservation(opts && opts.nextReservation ? opts.nextReservation : null);
   setWindowMode("kiosk");
   render();
+  if (socket && socket.connected) {
+    socket.emit("bay:state", { locked: true });
+  }
 }
 
 function doUnlock() {
   locked = false;
   notifyMessage = null;
+  showNextReservation(null);
   if (notifyTimeout) { clearTimeout(notifyTimeout); notifyTimeout = null; }
   if (endsAt && endsAt > Date.now()) {
     setWindowMode("timer");
@@ -124,11 +161,15 @@ function doUnlock() {
     setWindowMode("hidden");
   }
   render();
+  if (socket && socket.connected) {
+    socket.emit("bay:state", { locked: false });
+  }
 }
 
 function doStart(seconds, warn) {
   locked = false;
   notifyMessage = null;
+  showNextReservation(null);
   if (notifyTimeout) { clearTimeout(notifyTimeout); notifyTimeout = null; }
   endsAt = Date.now() + (seconds || 3600) * 1000;
   warned = false;
@@ -167,11 +208,11 @@ function render() {
     statusText.textContent = "DISCONNECTED";
   }
 
-  timerBar.style.display = "none";
+  timerBar.style.display  = "none";
   notifyBar.style.display = "none";
   lockScreen.style.display = "none";
-  hud.style.display = "none";
-  statusEl.style.display = "none";
+  hud.style.display       = "none";
+  statusEl.style.display  = "none";
 
   if (windowMode === "timer") {
     timerBar.style.display = "flex";
@@ -182,13 +223,13 @@ function render() {
       notifyText.textContent = notifyMessage.text;
     }
     if (endsAt && endsAt > Date.now()) {
-      notifyTimer.textContent = fmt(endsAt - Date.now());
+      notifyTimer.textContent = fmtMs(endsAt - Date.now());
       notifyTimer.style.display = "";
     } else {
       notifyTimer.style.display = "none";
     }
   } else if (windowMode === "kiosk") {
-    statusEl.style.display = "flex";
+    statusEl.style.display  = "flex";
     lockScreen.style.display = "flex";
   }
 }
@@ -196,15 +237,15 @@ function render() {
 function tick() {
   if (!endsAt || locked) {
     timerBarValue.textContent = "\u2014";
-    timerBarValue.className = "timer-value";
+    timerBarValue.className   = "timer-value";
     render();
     return;
   }
 
-  const msLeft = endsAt - Date.now();
-  const display = fmt(msLeft);
+  const msLeft  = endsAt - Date.now();
+  const display = fmtMs(msLeft);
   timerBarValue.textContent = display;
-  timeLeftEl.textContent = display;
+  timeLeftEl.textContent    = display;
 
   timerBarValue.className = "timer-value";
   if (msLeft <= 60000) {
@@ -226,15 +267,69 @@ function tick() {
   render();
 }
 
-function connect(serverUrl, bayId) {
-  if (socket) {
-    socket.disconnect();
-    socket = null;
+function handleCommand(data) {
+  var command = data.command || data.cmd;
+  var payload = data.payload || data;
+  lastServerSeen = Date.now();
+  connected = true;
+
+  if (command === "lock") {
+    if (payload.reason === "invalid_pin" || payload.reason === "invalid_request") {
+      showPinError("Incorrect code, please try again");
+      return;
+    }
+    pinUnlocked = false;
+    doLock({ nextReservation: payload.nextReservation || null });
+    return;
   }
-  if (pingInterval) {
-    clearInterval(pingInterval);
-    pingInterval = null;
+
+  if (command === "unlock") {
+    pinUnlocked = false;
+    doUnlock();
+    return;
   }
+
+  if (command === "start") {
+    doStart(payload.seconds, payload.warn);
+    return;
+  }
+
+  if (command === "extend") {
+    var extSec = payload.seconds || 900;
+    if (endsAt) {
+      endsAt += extSec * 1000;
+      if (endsAt - Date.now() > 10 * 60 * 1000) { warned = false; }
+    }
+    render();
+    return;
+  }
+
+  if (command === "end") {
+    pinUnlocked = false;
+    doLock({});
+    return;
+  }
+
+  if (command === "message") {
+    var msgContent = payload.text || "Message from staff";
+    showNotification("\u2709", msgContent, 15000);
+    return;
+  }
+
+  if (command === "hibernate") {
+    ipcRenderer.send("app:hibernate");
+    return;
+  }
+
+  if (command === "shutdown") {
+    ipcRenderer.send("app:shutdown");
+    return;
+  }
+}
+
+function connect(serverUrl, bayName, facilityId) {
+  if (socket) { socket.disconnect(); socket = null; }
+  if (pingInterval) { clearInterval(pingInterval); pingInterval = null; }
 
   socket = io(serverUrl, {
     transports: ["websocket", "polling"],
@@ -247,86 +342,43 @@ function connect(serverUrl, bayId) {
   socket.on("connect", function () {
     connected = true;
     lastServerSeen = Date.now();
-    socket.emit("bay:hello", { bayId: bayId, locked: locked });
+    var hello = { bayName: bayName };
+    if (facilityId) hello.facilityId = Number(facilityId);
+    socket.emit("bay:hello", hello);
     render();
   });
 
   socket.on("disconnect", function () {
     connected = false;
+    if (disconnectBehavior === "unlock" && locked) {
+      pinUnlocked = true;
+      locked = false;
+      showNextReservation(null);
+      setWindowMode("hidden");
+    }
     render();
   });
 
   socket.on("reconnect", function () {
     connected = true;
     lastServerSeen = Date.now();
-    socket.emit("bay:hello", { bayId: bayId, locked: locked });
+    var hello = { bayName: bayName };
+    if (facilityId) hello.facilityId = Number(facilityId);
+    socket.emit("bay:hello", hello);
     render();
   });
 
-  socket.on("bay:state", function (state) {
-    lastServerSeen = Date.now();
-    connected = true;
-    warned = false;
-
-    if (!!state.locked && pinUnlocked) {
-      return;
-    }
-    if (!!state.locked) {
-      doLock();
-    } else {
-      locked = false;
-      endsAt = state.endsAt || null;
-      notifyMessage = null;
-      if (endsAt && endsAt > Date.now()) {
-        setWindowMode("timer");
-      } else {
-        setWindowMode("hidden");
-      }
-      render();
-    }
+  socket.on("bay:hello:ack", function (data) {
+    disconnectBehavior = (data && data.disconnectBehavior) || null;
   });
 
   socket.on("bay:command", function (data) {
-    var cmd = data.cmd;
-    var payload = data.payload || {};
+    handleCommand(data);
+  });
+
+  socket.on("bay:pong", function () {
     lastServerSeen = Date.now();
     connected = true;
-
-    switch (cmd) {
-      case "lock":
-        pinUnlocked = false;
-        doLock();
-        break;
-
-      case "unlock":
-        doUnlock();
-        break;
-
-      case "start":
-        doStart(payload.seconds, payload.warn);
-        break;
-
-      case "extend":
-        var extSec = payload.seconds || 900;
-        if (endsAt) {
-          endsAt += extSec * 1000;
-          if (endsAt - Date.now() > 10 * 60 * 1000) {
-            warned = false;
-          }
-        }
-        render();
-        break;
-
-      case "end":
-        pinUnlocked = false;
-        doLock();
-        break;
-
-      case "message":
-        var msgContent = payload.text || "Message from staff";
-        showNotification("\u2709", msgContent, 15000);
-        break;
-    }
   });
 
   socket.onAny(function () {
@@ -335,48 +387,54 @@ function connect(serverUrl, bayId) {
 
   pingInterval = setInterval(function () {
     if (socket && socket.connected) {
-      socket.emit("bay:ping", { bayId: bayId });
+      socket.emit("bay:ping");
     }
-  }, 15000);
+  }, 25000);
 }
 
 var savedConfig = null;
 
 async function initConfig() {
   savedConfig = await ipcRenderer.invoke("config:load");
-  if (savedConfig && savedConfig.serverUrl && savedConfig.bayId) {
-    serverUrlIn.value = savedConfig.serverUrl;
-    bayIdIn.value = savedConfig.bayId;
+  if (savedConfig && savedConfig.serverUrl && (savedConfig.bayName || savedConfig.bayId)) {
+    var bayName    = savedConfig.bayName || savedConfig.bayId;
+    var facilityId = savedConfig.facilityId || "";
+    serverUrlIn.value  = savedConfig.serverUrl;
+    bayNameIn.value    = bayName;
+    facilityIdIn.value = facilityId;
     configPanel.classList.add("hidden");
     reconfigBtn.classList.remove("hidden");
-    connect(savedConfig.serverUrl, savedConfig.bayId);
+    connect(savedConfig.serverUrl, bayName, facilityId);
   }
 }
 
 saveBtn.addEventListener("click", async function () {
-  var serverUrl = serverUrlIn.value.trim();
-  var bayId = bayIdIn.value.trim();
+  var serverUrl  = serverUrlIn.value.trim();
+  var bayName    = bayNameIn.value.trim();
+  var facilityId = facilityIdIn.value.trim();
 
-  if (!serverUrl || !bayId) {
+  if (!serverUrl || !bayName) {
     serverUrlIn.style.borderColor = !serverUrl ? "#ef4444" : "";
-    bayIdIn.style.borderColor = !bayId ? "#ef4444" : "";
+    bayNameIn.style.borderColor   = !bayName   ? "#ef4444" : "";
     return;
   }
 
-  await ipcRenderer.invoke("config:save", { serverUrl: serverUrl, bayId: bayId });
-  savedConfig = { serverUrl: serverUrl, bayId: bayId };
+  var cfg = { serverUrl: serverUrl, bayName: bayName, facilityId: facilityId };
+  await ipcRenderer.invoke("config:save", cfg);
+  savedConfig = cfg;
 
   configPanel.classList.add("hidden");
   reconfigBtn.classList.remove("hidden");
-  connect(serverUrl, bayId);
+  connect(serverUrl, bayName, facilityId);
 });
 
 reconfigBtn.addEventListener("click", function () {
   configPanel.classList.remove("hidden");
   reconfigBtn.classList.add("hidden");
   if (savedConfig) {
-    serverUrlIn.value = savedConfig.serverUrl || "";
-    bayIdIn.value = savedConfig.bayId || "";
+    serverUrlIn.value  = savedConfig.serverUrl || "";
+    bayNameIn.value    = savedConfig.bayName || savedConfig.bayId || "";
+    facilityIdIn.value = savedConfig.facilityId || "";
   }
 });
 

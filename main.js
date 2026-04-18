@@ -1,6 +1,7 @@
 const { app, BrowserWindow, globalShortcut, ipcMain, screen } = require("electron");
 const path = require("path");
 const fs = require("fs");
+const { exec } = require("child_process");
 
 function getConfigPath() {
   return path.join(app.getPath("userData"), "bay-config.json");
@@ -26,6 +27,14 @@ ipcMain.handle("config:load", () => {
 ipcMain.handle("config:save", (event, config) => {
   saveConfig(config);
   return true;
+});
+
+ipcMain.on("app:hibernate", () => {
+  exec("rundll32.exe powrprof.dll,SetSuspendState Hibernate");
+});
+
+ipcMain.on("app:shutdown", () => {
+  exec("shutdown /s /t 0");
 });
 
 let win;
