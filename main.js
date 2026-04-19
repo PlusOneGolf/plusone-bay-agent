@@ -1,4 +1,4 @@
-const { app, BrowserWindow, globalShortcut, ipcMain, screen } = require("electron");
+const { app, BrowserWindow, globalShortcut, ipcMain, screen, dialog } = require("electron");
 const path = require("path");
 const fs = require("fs");
 const { exec } = require("child_process");
@@ -42,6 +42,15 @@ function getLocalConfig() {
 
 ipcMain.handle("app:config:load", () => {
   return getLocalConfig();
+});
+
+ipcMain.handle("dialog:open-file", async (event, opts) => {
+  const result = await dialog.showOpenDialog({
+    title: opts.title || "Select file",
+    filters: opts.filters || [{ name: "Executables", extensions: ["exe"] }],
+    properties: ["openFile"],
+  });
+  return result.canceled ? null : result.filePaths[0];
 });
 
 ipcMain.handle("app:config:save", (event, config) => {

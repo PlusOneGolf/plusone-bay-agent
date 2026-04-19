@@ -22,6 +22,8 @@ const saveBtn         = document.getElementById("saveConnect");
 const tpsPathIn       = document.getElementById("tpsPath");
 const tpsProcessIn    = document.getElementById("tpsProcessName");
 const nircmdPathIn    = document.getElementById("nircmdPath");
+const browseTpsBtn    = document.getElementById("browseBtn");
+const browseNircmdBtn = document.getElementById("browseNircmd");
 const nextReservation = document.getElementById("nextReservation");
 const nextResName     = document.getElementById("nextResName");
 const nextResTime     = document.getElementById("nextResTime");
@@ -532,6 +534,26 @@ reconfigBtn.addEventListener("click", function () {
     facilityIdIn.value = savedConfig.facilityId || "";
   }
   populateLocalConfigFields();
+});
+
+browseTpsBtn.addEventListener("click", async function () {
+  var chosen = await ipcRenderer.invoke("dialog:open-file", {
+    title: "Select TPS / TrackMan executable",
+    filters: [{ name: "Executables", extensions: ["exe"] }, { name: "All Files", extensions: ["*"] }],
+  });
+  if (chosen) {
+    tpsPathIn.value = chosen;
+    var name = chosen.split("\\").pop().replace(/\.exe$/i, "");
+    if (!tpsProcessIn.value) tpsProcessIn.value = name;
+  }
+});
+
+browseNircmdBtn.addEventListener("click", async function () {
+  var chosen = await ipcRenderer.invoke("dialog:open-file", {
+    title: "Select nircmd.exe",
+    filters: [{ name: "nircmd", extensions: ["exe"] }, { name: "All Files", extensions: ["*"] }],
+  });
+  if (chosen) nircmdPathIn.value = chosen;
 });
 
 initConfig();
