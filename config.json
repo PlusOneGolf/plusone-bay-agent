@@ -1,0 +1,6 @@
+{
+  "tpsPath": "C:\\Path\\To\\TPS.exe",
+  "tpsProcessName": "TPS",
+  "nircmdPath": "C:\\nircmd\\nircmd.exe",
+  "displayOffDelaySeconds": 300
+}

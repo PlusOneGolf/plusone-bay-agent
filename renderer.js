@@ -38,6 +38,7 @@ let notifyMessage      = null;
 let notifyTimeout      = null;
 let displayOffTimer    = null;
 let displayWakeTimer   = null;
+let localConfig        = {};
 
 const STAFF_PIN = "7748";
 let pinBuffer = "";
@@ -93,6 +94,7 @@ document.addEventListener("keydown", function (e) {
         wakeDisplay();
         pinUnlocked = true;
         doUnlock();
+        ipcRenderer.send("tps:launch");
         if (socket && socket.connected) {
           socket.emit("bay:state", { locked: false });
         }
@@ -285,7 +287,8 @@ function sleepDisplay() {
 }
 
 function scheduleDisplayOff(delaySeconds) {
-  var ms = (delaySeconds || 300) * 1000;
+  var fallback = (localConfig && localConfig.displayOffDelaySeconds) || 300;
+  var ms = (delaySeconds || fallback) * 1000;
   displayOffTimer = setTimeout(function () {
     displayOffTimer = null;
     sleepDisplay();
@@ -314,11 +317,12 @@ function handleCommand(data) {
       return;
     }
     cancelDisplayTimers();
+    ipcRenderer.send("tps:kill");
     pinUnlocked = false;
     doLock({ nextReservation: payload.nextReservation || null });
 
     if (payload.mode === "sleep") {
-      scheduleDisplayOff(payload.displayOffDelaySeconds || 300);
+      scheduleDisplayOff(payload.displayOffDelaySeconds || null);
       if (payload.wakeAt) { scheduleDisplayWake(payload.wakeAt); }
     }
     return;
@@ -329,6 +333,7 @@ function handleCommand(data) {
     wakeDisplay();
     pinUnlocked = false;
     doUnlock();
+    ipcRenderer.send("tps:launch");
     return;
   }
 
@@ -349,6 +354,7 @@ function handleCommand(data) {
 
   if (command === "end") {
     cancelDisplayTimers();
+    ipcRenderer.send("tps:kill");
     pinUnlocked = false;
     doLock({});
     return;
@@ -385,9 +391,12 @@ function connect(serverUrl, bayName, facilityId) {
   socket.on("disconnect", function () {
     connected = false;
     if (disconnectBehavior === "unlock" && locked) {
+      cancelDisplayTimers();
+      wakeDisplay();
       pinUnlocked = true;
       locked = false;
       showNextReservation(null);
+      ipcRenderer.send("tps:launch");
       setWindowMode("hidden");
     }
     render();
@@ -429,6 +438,7 @@ function connect(serverUrl, bayName, facilityId) {
 var savedConfig = null;
 
 async function initConfig() {
+  localConfig = (await ipcRenderer.invoke("app:config:load")) || {};
   savedConfig = await ipcRenderer.invoke("config:load");
   if (savedConfig && savedConfig.serverUrl && (savedConfig.bayName || savedConfig.bayId)) {
     var bayName    = savedConfig.bayName || savedConfig.bayId;

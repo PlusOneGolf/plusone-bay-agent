@@ -29,15 +29,42 @@ ipcMain.handle("config:save", (event, config) => {
   return true;
 });
 
-const NIRCMD = "C:\\nircmd\\nircmd.exe";
 const DISPLAY_WAKE_CMD = `powershell -Command "Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.Cursor]::Position = [System.Drawing.Point]::new(1,1); Start-Sleep -Milliseconds 100; [System.Windows.Forms.Cursor]::Position = [System.Drawing.Point]::new(0,0)"`;
 
+function getLocalConfig() {
+  try {
+    const data = fs.readFileSync(path.join(__dirname, "config.json"), "utf-8");
+    return JSON.parse(data);
+  } catch (e) {
+    return {};
+  }
+}
+
+ipcMain.handle("app:config:load", () => {
+  return getLocalConfig();
+});
+
 ipcMain.on("display:off", () => {
-  exec(`"${NIRCMD}" monitor off`);
+  const cfg = getLocalConfig();
+  const nircmd = cfg.nircmdPath || "C:\\nircmd\\nircmd.exe";
+  exec(`"${nircmd}" monitor off`);
 });
 
 ipcMain.on("display:wake", () => {
   exec(DISPLAY_WAKE_CMD);
+});
+
+ipcMain.on("tps:kill", () => {
+  const cfg = getLocalConfig();
+  const name = cfg.tpsProcessName || "TPS";
+  exec(`taskkill /IM "${name}.exe" /F`);
+});
+
+ipcMain.on("tps:launch", () => {
+  const cfg = getLocalConfig();
+  if (cfg.tpsPath) {
+    exec(`start "" "${cfg.tpsPath}"`);
+  }
 });
 
 let win;
