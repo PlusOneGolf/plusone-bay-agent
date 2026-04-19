@@ -36,6 +36,8 @@ let pinUnlocked        = false;
 let disconnectBehavior = null;
 let notifyMessage      = null;
 let notifyTimeout      = null;
+let displayOffTimer    = null;
+let displayWakeTimer   = null;
 
 const STAFF_PIN = "7748";
 let pinBuffer = "";
@@ -87,6 +89,8 @@ document.addEventListener("keydown", function (e) {
       resetPin();
 
       if (entered === STAFF_PIN) {
+        cancelDisplayTimers();
+        wakeDisplay();
         pinUnlocked = true;
         doUnlock();
         if (socket && socket.connected) {
@@ -267,6 +271,37 @@ function tick() {
   render();
 }
 
+function cancelDisplayTimers() {
+  if (displayOffTimer)  { clearTimeout(displayOffTimer);  displayOffTimer  = null; }
+  if (displayWakeTimer) { clearTimeout(displayWakeTimer); displayWakeTimer = null; }
+}
+
+function wakeDisplay() {
+  ipcRenderer.send("display:wake");
+}
+
+function sleepDisplay() {
+  ipcRenderer.send("display:off");
+}
+
+function scheduleDisplayOff(delaySeconds) {
+  var ms = (delaySeconds || 300) * 1000;
+  displayOffTimer = setTimeout(function () {
+    displayOffTimer = null;
+    sleepDisplay();
+  }, ms);
+}
+
+function scheduleDisplayWake(wakeAtIso) {
+  if (!wakeAtIso) return;
+  var wakeMs = new Date(wakeAtIso).getTime() - Date.now();
+  if (wakeMs <= 0) { wakeDisplay(); return; }
+  displayWakeTimer = setTimeout(function () {
+    displayWakeTimer = null;
+    wakeDisplay();
+  }, wakeMs);
+}
+
 function handleCommand(data) {
   var command = data.command || data.cmd;
   var payload = data.payload || data;
@@ -278,12 +313,20 @@ function handleCommand(data) {
       showPinError("Incorrect code, please try again");
       return;
     }
+    cancelDisplayTimers();
     pinUnlocked = false;
     doLock({ nextReservation: payload.nextReservation || null });
+
+    if (payload.mode === "sleep") {
+      scheduleDisplayOff(payload.displayOffDelaySeconds || 300);
+      if (payload.wakeAt) { scheduleDisplayWake(payload.wakeAt); }
+    }
     return;
   }
 
   if (command === "unlock") {
+    cancelDisplayTimers();
+    wakeDisplay();
     pinUnlocked = false;
     doUnlock();
     return;
@@ -305,6 +348,7 @@ function handleCommand(data) {
   }
 
   if (command === "end") {
+    cancelDisplayTimers();
     pinUnlocked = false;
     doLock({});
     return;
@@ -313,16 +357,6 @@ function handleCommand(data) {
   if (command === "message") {
     var msgContent = payload.text || "Message from staff";
     showNotification("\u2709", msgContent, 15000);
-    return;
-  }
-
-  if (command === "hibernate") {
-    ipcRenderer.send("app:hibernate");
-    return;
-  }
-
-  if (command === "shutdown") {
-    ipcRenderer.send("app:shutdown");
     return;
   }
 }

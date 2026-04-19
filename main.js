@@ -29,12 +29,15 @@ ipcMain.handle("config:save", (event, config) => {
   return true;
 });
 
-ipcMain.on("app:hibernate", () => {
-  exec("rundll32.exe powrprof.dll,SetSuspendState Hibernate");
+const NIRCMD = "C:\\nircmd\\nircmd.exe";
+const DISPLAY_WAKE_CMD = `powershell -Command "Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.Cursor]::Position = [System.Drawing.Point]::new(1,1); Start-Sleep -Milliseconds 100; [System.Windows.Forms.Cursor]::Position = [System.Drawing.Point]::new(0,0)"`;
+
+ipcMain.on("display:off", () => {
+  exec(`"${NIRCMD}" monitor off`);
 });
 
-ipcMain.on("app:shutdown", () => {
-  exec("shutdown /s /t 0");
+ipcMain.on("display:wake", () => {
+  exec(DISPLAY_WAKE_CMD);
 });
 
 let win;
