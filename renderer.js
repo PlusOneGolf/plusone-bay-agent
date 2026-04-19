@@ -23,7 +23,7 @@ const notifyTimer      = document.getElementById("notifyTimer");
 const statusEl         = document.getElementById("status");
 const statusDot        = document.getElementById("statusDot");
 const statusText       = document.getElementById("statusText");
-const reconfigBtn      = document.getElementById("reconfigureBtn");
+
 const serverUrlIn      = document.getElementById("serverUrl");
 const bayNameIn        = document.getElementById("bayName");
 const facilityIdIn     = document.getElementById("facilityId");
@@ -110,13 +110,13 @@ document.addEventListener("keydown", function (e) {
       resetPin();
 
       if (entered === STAFF_PIN) {
-        log("PIN staff unlock");
+        log("PIN staff unlock → opening settings");
         cancelDisplayTimers();
         wakeDisplay();
         pinUnlocked = true;
         doUnlock();
-        reconfigBtn.classList.remove("hidden");
         ipcRenderer.send("tps:launch");
+        showSetupSummary();
         if (socket && socket.connected) {
           log("emit bay:state {locked:false}");
           socket.emit("bay:state", { locked: false });
@@ -171,7 +171,6 @@ function doLock(opts) {
   warnEnabled = false;
   pinUnlocked = false;
   notifyMessage = null;
-  reconfigBtn.classList.add("hidden");
   if (notifyTimeout) { clearTimeout(notifyTimeout); notifyTimeout = null; }
   showNextReservation(opts && opts.nextReservation ? opts.nextReservation : null);
   setWindowMode("kiosk");
@@ -487,7 +486,6 @@ function populateLocalConfigFields() {
 
 function launchKiosk() {
   locked = true;
-  reconfigBtn.classList.add("hidden");
   setWindowMode("kiosk");
   render();
 }
@@ -602,10 +600,6 @@ backToSummaryBtn.addEventListener("click", function () {
   showSetupSummary();
 });
 
-reconfigBtn.addEventListener("click", function () {
-  reconfigBtn.classList.add("hidden");
-  showSetupSummary();
-});
 
 browseTpsBtn.addEventListener("click", async function () {
   var chosen = await ipcRenderer.invoke("dialog:open-file", {
