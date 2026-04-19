@@ -67,6 +67,27 @@ ipcMain.on("tps:launch", () => {
   }
 });
 
+function getLogPath() {
+  return path.join(app.getPath("userData"), "bay-agent.log");
+}
+
+const MAX_LOG_BYTES = 5 * 1024 * 1024;
+
+ipcMain.on("log:write", (event, message) => {
+  try {
+    const stamp = new Date().toISOString();
+    const line = `[${stamp}] ${message}\n`;
+    const logPath = getLogPath();
+    let stat;
+    try { stat = fs.statSync(logPath); } catch (e) { stat = null; }
+    if (stat && stat.size > MAX_LOG_BYTES) {
+      fs.writeFileSync(logPath, line, "utf-8");
+    } else {
+      fs.appendFileSync(logPath, line, "utf-8");
+    }
+  } catch (e) {}
+});
+
 let win;
 let isOverlayVisible = true;
 let currentMode = "kiosk";
@@ -85,6 +106,8 @@ function createWindow() {
     resizable: false,
     minimizable: false,
     closable: false,
+    transparent: true,
+    backgroundColor: "#00000000",
     webPreferences: {
       nodeIntegration: true,
       contextIsolation: false,
@@ -124,8 +147,8 @@ function setTimerBarMode() {
   if (!win) return;
   const display = screen.getPrimaryDisplay();
   const screenWidth = display.workAreaSize.width;
-  const barWidth = 240;
-  const barHeight = 48;
+  const barWidth = 220;
+  const barHeight = 50;
   const xPos = Math.round((screenWidth - barWidth) / 2);
 
   currentMode = "timer";
@@ -140,7 +163,7 @@ function setTimerBarMode() {
     win.setIgnoreMouseEvents(true);
     win.setSkipTaskbar(true);
     win.showInactive();
-  }, 100);
+  }, 250);
 }
 
 function setNotifyBarMode() {
@@ -163,7 +186,7 @@ function setNotifyBarMode() {
     win.setIgnoreMouseEvents(true);
     win.setSkipTaskbar(true);
     win.showInactive();
-  }, 100);
+  }, 250);
 }
 
 function setHiddenMode() {
@@ -208,6 +231,14 @@ app.on("ready", () => {
       app.quit();
     }
   });
+
+  globalShortcut.register("CommandOrControl+Shift+D", () => {
+    if (win) {
+      win.webContents.openDevTools({ mode: "detach" });
+    }
+  });
+
+  ipcMain.handle("log:path", () => getLogPath());
 });
 
 app.on("window-all-closed", () => {

@@ -40,6 +40,12 @@ let displayOffTimer    = null;
 let displayWakeTimer   = null;
 let localConfig        = {};
 
+function log(msg) {
+  var prefix = typeof msg === "string" ? msg : JSON.stringify(msg);
+  console.log(prefix);
+  ipcRenderer.send("log:write", prefix);
+}
+
 const STAFF_PIN = "7748";
 let pinBuffer = "";
 let pinTimer  = null;
@@ -90,16 +96,19 @@ document.addEventListener("keydown", function (e) {
       resetPin();
 
       if (entered === STAFF_PIN) {
+        log("PIN staff unlock");
         cancelDisplayTimers();
         wakeDisplay();
         pinUnlocked = true;
         doUnlock();
         ipcRenderer.send("tps:launch");
         if (socket && socket.connected) {
+          log("emit bay:state {locked:false}");
           socket.emit("bay:state", { locked: false });
         }
       } else {
         if (socket && socket.connected) {
+          log("emit bay:pin-unlock (PIN hidden)");
           socket.emit("bay:pin-unlock", { pin: entered });
         } else {
           showPinError("Incorrect code, please try again");
@@ -313,9 +322,11 @@ function handleCommand(data) {
 
   if (command === "lock") {
     if (payload.reason === "invalid_pin" || payload.reason === "invalid_request") {
+      log("CMD lock rejected reason=" + payload.reason);
       showPinError("Incorrect code, please try again");
       return;
     }
+    log("CMD lock mode=" + (payload.mode || "transition") + " next=" + JSON.stringify(payload.nextReservation || null));
     cancelDisplayTimers();
     ipcRenderer.send("tps:kill");
     pinUnlocked = false;
@@ -329,6 +340,7 @@ function handleCommand(data) {
   }
 
   if (command === "unlock") {
+    log("CMD unlock");
     cancelDisplayTimers();
     wakeDisplay();
     pinUnlocked = false;
@@ -384,12 +396,14 @@ function connect(serverUrl, bayName, facilityId) {
     lastServerSeen = Date.now();
     var hello = { bayName: bayName };
     if (facilityId) hello.facilityId = Number(facilityId);
+    log("CONNECTED to " + serverUrl + " | emit bay:hello " + JSON.stringify(hello));
     socket.emit("bay:hello", hello);
     render();
   });
 
-  socket.on("disconnect", function () {
+  socket.on("disconnect", function (reason) {
     connected = false;
+    log("DISCONNECTED reason=" + reason + " disconnectBehavior=" + disconnectBehavior + " locked=" + locked);
     if (disconnectBehavior === "unlock" && locked) {
       cancelDisplayTimers();
       wakeDisplay();
@@ -397,25 +411,33 @@ function connect(serverUrl, bayName, facilityId) {
       locked = false;
       showNextReservation(null);
       ipcRenderer.send("tps:launch");
+      log("disconnect:unlock → launching TPS, hiding window");
       setWindowMode("hidden");
     }
     render();
   });
 
-  socket.on("reconnect", function () {
+  socket.on("reconnect", function (attempt) {
     connected = true;
     lastServerSeen = Date.now();
     var hello = { bayName: bayName };
     if (facilityId) hello.facilityId = Number(facilityId);
+    log("RECONNECTED attempt=" + attempt + " | emit bay:hello " + JSON.stringify(hello));
     socket.emit("bay:hello", hello);
     render();
   });
 
+  socket.on("connect_error", function (err) {
+    log("CONNECT_ERROR " + err.message);
+  });
+
   socket.on("bay:hello:ack", function (data) {
     disconnectBehavior = (data && data.disconnectBehavior) || null;
+    log("RECV bay:hello:ack " + JSON.stringify(data));
   });
 
   socket.on("bay:command", function (data) {
+    log("RECV bay:command " + JSON.stringify(data));
     handleCommand(data);
   });
 
@@ -424,8 +446,11 @@ function connect(serverUrl, bayName, facilityId) {
     connected = true;
   });
 
-  socket.onAny(function () {
+  socket.onAny(function (event, data) {
     lastServerSeen = Date.now();
+    if (event !== "bay:pong") {
+      log("RECV " + event + (data !== undefined ? " " + JSON.stringify(data) : ""));
+    }
   });
 
   pingInterval = setInterval(function () {
@@ -439,6 +464,9 @@ var savedConfig = null;
 
 async function initConfig() {
   localConfig = (await ipcRenderer.invoke("app:config:load")) || {};
+  var logPath = await ipcRenderer.invoke("log:path");
+  log("=== Bay Agent starting | log=" + logPath + " ===");
+  log("localConfig " + JSON.stringify(localConfig));
   savedConfig = await ipcRenderer.invoke("config:load");
   if (savedConfig && savedConfig.serverUrl && (savedConfig.bayName || savedConfig.bayId)) {
     var bayName    = savedConfig.bayName || savedConfig.bayId;
