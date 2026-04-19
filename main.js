@@ -45,11 +45,27 @@ ipcMain.handle("app:config:load", () => {
 });
 
 ipcMain.handle("dialog:open-file", async (event, opts) => {
-  const result = await dialog.showOpenDialog({
-    title: opts.title || "Select file",
-    filters: opts.filters || [{ name: "Executables", extensions: ["exe"] }],
-    properties: ["openFile"],
-  });
+  const wasKiosk = win && win.isKiosk();
+  const wasFullscreen = win && win.isFullScreen();
+  if (wasKiosk) win.setKiosk(false);
+  if (wasFullscreen) win.setFullScreen(false);
+  if (win) win.setAlwaysOnTop(false);
+
+  let result;
+  try {
+    result = await dialog.showOpenDialog(win || undefined, {
+      title: opts.title || "Select file",
+      filters: opts.filters || [{ name: "Executables", extensions: ["exe"] }],
+      properties: ["openFile"],
+    });
+  } finally {
+    if (win) {
+      if (wasFullscreen) win.setFullScreen(true);
+      if (wasKiosk) win.setKiosk(true);
+      win.setAlwaysOnTop(true, "screen-saver");
+      win.focus();
+    }
+  }
   return result.canceled ? null : result.filePaths[0];
 });
 
