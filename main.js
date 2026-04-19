@@ -295,6 +295,11 @@ app.on("ready", () => {
   });
 
   ipcMain.handle("log:path", () => getLogPath());
+
+  ipcMain.on("app:quit", () => {
+    if (win) win.removeAllListeners("close");
+    app.quit();
+  });
 });
 
 app.on("window-all-closed", () => {

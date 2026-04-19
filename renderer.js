@@ -600,6 +600,13 @@ backToSummaryBtn.addEventListener("click", function () {
   showSetupSummary();
 });
 
+document.getElementById("quitBtnSummary").addEventListener("click", function () {
+  ipcRenderer.send("app:quit");
+});
+
+document.getElementById("quitBtnForm").addEventListener("click", function () {
+  ipcRenderer.send("app:quit");
+});
 
 browseTpsBtn.addEventListener("click", async function () {
   var chosen = await ipcRenderer.invoke("dialog:open-file", {
