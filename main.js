@@ -44,6 +44,17 @@ ipcMain.handle("app:config:load", () => {
   return getLocalConfig();
 });
 
+ipcMain.handle("app:config:save", (event, config) => {
+  try {
+    const existing = getLocalConfig();
+    const merged = Object.assign({}, existing, config);
+    fs.writeFileSync(path.join(__dirname, "config.json"), JSON.stringify(merged, null, 2), "utf-8");
+    return true;
+  } catch (e) {
+    return false;
+  }
+});
+
 ipcMain.on("display:off", () => {
   const cfg = getLocalConfig();
   const nircmd = cfg.nircmdPath || "C:\\nircmd\\nircmd.exe";

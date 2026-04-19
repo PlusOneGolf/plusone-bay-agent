@@ -293,6 +293,23 @@
       transition: background 0.2s;
     }
     .config button:hover { background: #1d4ed8; }
+    .config-divider {
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.07em;
+      text-transform: uppercase;
+      color: rgba(255,255,255,0.25);
+      margin: 14px 0 10px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .config-divider::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: rgba(255,255,255,0.07);
+    }
     .reconfigure-link {
       display: inline-block;
       margin-top: 16px;
@@ -366,6 +383,10 @@
       <input type="text" id="serverUrl" placeholder="Server URL (e.g. https://your-app.replit.app)" />
       <input type="text" id="bayName" placeholder="Bay Name (e.g. Bay-1)" />
       <input type="text" id="facilityId" placeholder="Facility ID (e.g. 2)" />
+      <div class="config-divider">TrackMan / TPS</div>
+      <input type="text" id="tpsPath" placeholder='TPS path (e.g. C:\TrackMan\TPS.exe)' />
+      <input type="text" id="tpsProcessName" placeholder="TPS process name (e.g. TPS)" />
+      <input type="text" id="nircmdPath" placeholder='nircmd path (e.g. C:\nircmd\nircmd.exe)' />
       <button id="saveConnect">Save &amp; Connect</button>
     </div>
 

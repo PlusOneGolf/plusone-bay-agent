@@ -19,6 +19,9 @@ const serverUrlIn     = document.getElementById("serverUrl");
 const bayNameIn       = document.getElementById("bayName");
 const facilityIdIn    = document.getElementById("facilityId");
 const saveBtn         = document.getElementById("saveConnect");
+const tpsPathIn       = document.getElementById("tpsPath");
+const tpsProcessIn    = document.getElementById("tpsProcessName");
+const nircmdPathIn    = document.getElementById("nircmdPath");
 const nextReservation = document.getElementById("nextReservation");
 const nextResName     = document.getElementById("nextResName");
 const nextResTime     = document.getElementById("nextResTime");
@@ -462,11 +465,18 @@ function connect(serverUrl, bayName, facilityId) {
 
 var savedConfig = null;
 
+function populateLocalConfigFields() {
+  tpsPathIn.value    = localConfig.tpsPath        || "";
+  tpsProcessIn.value = localConfig.tpsProcessName || "";
+  nircmdPathIn.value = localConfig.nircmdPath      || "";
+}
+
 async function initConfig() {
   localConfig = (await ipcRenderer.invoke("app:config:load")) || {};
   var logPath = await ipcRenderer.invoke("log:path");
   log("=== Bay Agent starting | log=" + logPath + " ===");
   log("localConfig " + JSON.stringify(localConfig));
+  populateLocalConfigFields();
   savedConfig = await ipcRenderer.invoke("config:load");
   if (savedConfig && savedConfig.serverUrl && (savedConfig.bayName || savedConfig.bayId)) {
     var bayName    = savedConfig.bayName || savedConfig.bayId;
@@ -481,9 +491,12 @@ async function initConfig() {
 }
 
 saveBtn.addEventListener("click", async function () {
-  var serverUrl  = serverUrlIn.value.trim();
-  var bayName    = bayNameIn.value.trim();
-  var facilityId = facilityIdIn.value.trim();
+  var serverUrl   = serverUrlIn.value.trim();
+  var bayName     = bayNameIn.value.trim();
+  var facilityId  = facilityIdIn.value.trim();
+  var tpsPath     = tpsPathIn.value.trim();
+  var tpsProcess  = tpsProcessIn.value.trim();
+  var nircmdPath  = nircmdPathIn.value.trim();
 
   if (!serverUrl || !bayName) {
     serverUrlIn.style.borderColor = !serverUrl ? "#ef4444" : "";
@@ -494,6 +507,16 @@ saveBtn.addEventListener("click", async function () {
   var cfg = { serverUrl: serverUrl, bayName: bayName, facilityId: facilityId };
   await ipcRenderer.invoke("config:save", cfg);
   savedConfig = cfg;
+
+  var localCfg = {};
+  if (tpsPath)    localCfg.tpsPath        = tpsPath;
+  if (tpsProcess) localCfg.tpsProcessName = tpsProcess;
+  if (nircmdPath) localCfg.nircmdPath     = nircmdPath;
+  if (Object.keys(localCfg).length > 0) {
+    await ipcRenderer.invoke("app:config:save", localCfg);
+    localConfig = Object.assign({}, localConfig, localCfg);
+    log("localConfig saved " + JSON.stringify(localCfg));
+  }
 
   configPanel.classList.add("hidden");
   reconfigBtn.classList.remove("hidden");
@@ -508,6 +531,7 @@ reconfigBtn.addEventListener("click", function () {
     bayNameIn.value    = savedConfig.bayName || savedConfig.bayId || "";
     facilityIdIn.value = savedConfig.facilityId || "";
   }
+  populateLocalConfigFields();
 });
 
 initConfig();
