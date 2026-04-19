@@ -1,32 +1,41 @@
 const { io } = require("socket.io-client");
 const { ipcRenderer } = require("electron");
 
-const lockScreen      = document.getElementById("lockScreen");
-const hud             = document.getElementById("hud");
-const timeLeftEl      = document.getElementById("timeLeft");
-const timerBar        = document.getElementById("timerBar");
-const timerBarValue   = document.getElementById("timerBarValue");
-const notifyBar       = document.getElementById("notifyBar");
-const notifyIcon      = document.getElementById("notifyIcon");
-const notifyText      = document.getElementById("notifyText");
-const notifyTimer     = document.getElementById("notifyTimer");
-const statusEl        = document.getElementById("status");
-const statusDot       = document.getElementById("statusDot");
-const statusText      = document.getElementById("statusText");
-const configPanel     = document.getElementById("configPanel");
-const reconfigBtn     = document.getElementById("reconfigureBtn");
-const serverUrlIn     = document.getElementById("serverUrl");
-const bayNameIn       = document.getElementById("bayName");
-const facilityIdIn    = document.getElementById("facilityId");
-const saveBtn         = document.getElementById("saveConnect");
-const tpsPathIn       = document.getElementById("tpsPath");
-const tpsProcessIn    = document.getElementById("tpsProcessName");
-const nircmdPathIn    = document.getElementById("nircmdPath");
-const browseTpsBtn    = document.getElementById("browseBtn");
-const browseNircmdBtn = document.getElementById("browseNircmd");
-const nextReservation = document.getElementById("nextReservation");
-const nextResName     = document.getElementById("nextResName");
-const nextResTime     = document.getElementById("nextResTime");
+const setupScreen      = document.getElementById("setupScreen");
+const setupSummary     = document.getElementById("setupSummary");
+const setupFormWrap    = document.getElementById("setupFormWrap");
+const connectBtn       = document.getElementById("connectBtn");
+const editSettingsBtn  = document.getElementById("editSettingsBtn");
+const backToSummaryBtn = document.getElementById("backToSummaryBtn");
+const summaryServer    = document.getElementById("summaryServer");
+const summaryBay       = document.getElementById("summaryBay");
+const summaryTps       = document.getElementById("summaryTps");
+const summaryTpsRow    = document.getElementById("summaryTpsRow");
+const lockScreen       = document.getElementById("lockScreen");
+const hud              = document.getElementById("hud");
+const timeLeftEl       = document.getElementById("timeLeft");
+const timerBar         = document.getElementById("timerBar");
+const timerBarValue    = document.getElementById("timerBarValue");
+const notifyBar        = document.getElementById("notifyBar");
+const notifyIcon       = document.getElementById("notifyIcon");
+const notifyText       = document.getElementById("notifyText");
+const notifyTimer      = document.getElementById("notifyTimer");
+const statusEl         = document.getElementById("status");
+const statusDot        = document.getElementById("statusDot");
+const statusText       = document.getElementById("statusText");
+const reconfigBtn      = document.getElementById("reconfigureBtn");
+const serverUrlIn      = document.getElementById("serverUrl");
+const bayNameIn        = document.getElementById("bayName");
+const facilityIdIn     = document.getElementById("facilityId");
+const saveBtn          = document.getElementById("saveConnect");
+const tpsPathIn        = document.getElementById("tpsPath");
+const tpsProcessIn     = document.getElementById("tpsProcessName");
+const nircmdPathIn     = document.getElementById("nircmdPath");
+const browseTpsBtn     = document.getElementById("browseBtn");
+const browseNircmdBtn  = document.getElementById("browseNircmd");
+const nextReservation  = document.getElementById("nextReservation");
+const nextResName      = document.getElementById("nextResName");
+const nextResTime      = document.getElementById("nextResTime");
 
 let socket             = null;
 let endsAt             = null;
@@ -35,7 +44,7 @@ let warned             = false;
 let connected          = false;
 let lastServerSeen     = 0;
 let pingInterval       = null;
-let windowMode         = "kiosk";
+let windowMode         = "setup";
 let warnEnabled        = false;
 let pinUnlocked        = false;
 let disconnectBehavior = null;
@@ -106,6 +115,7 @@ document.addEventListener("keydown", function (e) {
         wakeDisplay();
         pinUnlocked = true;
         doUnlock();
+        reconfigBtn.classList.remove("hidden");
         ipcRenderer.send("tps:launch");
         if (socket && socket.connected) {
           log("emit bay:state {locked:false}");
@@ -161,6 +171,7 @@ function doLock(opts) {
   warnEnabled = false;
   pinUnlocked = false;
   notifyMessage = null;
+  reconfigBtn.classList.add("hidden");
   if (notifyTimeout) { clearTimeout(notifyTimeout); notifyTimeout = null; }
   showNextReservation(opts && opts.nextReservation ? opts.nextReservation : null);
   setWindowMode("kiosk");
@@ -228,11 +239,12 @@ function render() {
     statusText.textContent = "DISCONNECTED";
   }
 
-  timerBar.style.display  = "none";
-  notifyBar.style.display = "none";
+  setupScreen.classList.toggle("hidden", windowMode !== "setup");
+  timerBar.style.display   = "none";
+  notifyBar.style.display  = "none";
   lockScreen.style.display = "none";
-  hud.style.display       = "none";
-  statusEl.style.display  = "none";
+  hud.style.display        = "none";
+  statusEl.style.display   = "none";
 
   if (windowMode === "timer") {
     timerBar.style.display = "flex";
@@ -249,7 +261,7 @@ function render() {
       notifyTimer.style.display = "none";
     }
   } else if (windowMode === "kiosk") {
-    statusEl.style.display  = "flex";
+    statusEl.style.display   = "flex";
     lockScreen.style.display = "flex";
   }
 }
@@ -473,6 +485,44 @@ function populateLocalConfigFields() {
   nircmdPathIn.value = localConfig.nircmdPath      || "";
 }
 
+function launchKiosk() {
+  locked = true;
+  reconfigBtn.classList.add("hidden");
+  setWindowMode("kiosk");
+  render();
+}
+
+function showSetupForm() {
+  setupSummary.classList.add("hidden");
+  setupFormWrap.classList.remove("hidden");
+  backToSummaryBtn.classList.add("hidden");
+  setWindowMode("setup");
+  render();
+}
+
+function showSetupSummary() {
+  if (!savedConfig) { showSetupForm(); return; }
+  summaryServer.textContent = savedConfig.serverUrl || "";
+  summaryBay.textContent    = savedConfig.bayName || savedConfig.bayId || "";
+  var tpsFile = localConfig.tpsPath ? localConfig.tpsPath.split("\\").pop() : null;
+  if (tpsFile) {
+    summaryTps.textContent = tpsFile;
+    summaryTpsRow.classList.remove("hidden");
+  } else {
+    summaryTpsRow.classList.add("hidden");
+  }
+  if (savedConfig) {
+    serverUrlIn.value  = savedConfig.serverUrl || "";
+    bayNameIn.value    = savedConfig.bayName || savedConfig.bayId || "";
+    facilityIdIn.value = savedConfig.facilityId || "";
+  }
+  populateLocalConfigFields();
+  setupSummary.classList.remove("hidden");
+  setupFormWrap.classList.add("hidden");
+  setWindowMode("setup");
+  render();
+}
+
 async function initConfig() {
   localConfig = (await ipcRenderer.invoke("app:config:load")) || {};
   var logPath = await ipcRenderer.invoke("log:path");
@@ -486,9 +536,12 @@ async function initConfig() {
     serverUrlIn.value  = savedConfig.serverUrl;
     bayNameIn.value    = bayName;
     facilityIdIn.value = facilityId;
-    configPanel.classList.add("hidden");
-    reconfigBtn.classList.remove("hidden");
+    log("Saved config found — launching kiosk directly");
+    launchKiosk();
     connect(savedConfig.serverUrl, bayName, facilityId);
+  } else {
+    log("No saved config — showing setup screen");
+    showSetupForm();
   }
 }
 
@@ -520,20 +573,38 @@ saveBtn.addEventListener("click", async function () {
     log("localConfig saved " + JSON.stringify(localCfg));
   }
 
-  configPanel.classList.add("hidden");
-  reconfigBtn.classList.remove("hidden");
+  log("Setup complete — launching kiosk");
+  launchKiosk();
   connect(serverUrl, bayName, facilityId);
 });
 
-reconfigBtn.addEventListener("click", function () {
-  configPanel.classList.remove("hidden");
-  reconfigBtn.classList.add("hidden");
+connectBtn.addEventListener("click", function () {
+  var bayName    = savedConfig.bayName || savedConfig.bayId;
+  var facilityId = savedConfig.facilityId || "";
+  log("Connect clicked — launching kiosk");
+  launchKiosk();
+  connect(savedConfig.serverUrl, bayName, facilityId);
+});
+
+editSettingsBtn.addEventListener("click", function () {
   if (savedConfig) {
     serverUrlIn.value  = savedConfig.serverUrl || "";
     bayNameIn.value    = savedConfig.bayName || savedConfig.bayId || "";
     facilityIdIn.value = savedConfig.facilityId || "";
   }
   populateLocalConfigFields();
+  setupSummary.classList.add("hidden");
+  setupFormWrap.classList.remove("hidden");
+  backToSummaryBtn.classList.remove("hidden");
+});
+
+backToSummaryBtn.addEventListener("click", function () {
+  showSetupSummary();
+});
+
+reconfigBtn.addEventListener("click", function () {
+  reconfigBtn.classList.add("hidden");
+  showSetupSummary();
 });
 
 browseTpsBtn.addEventListener("click", async function () {

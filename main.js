@@ -128,23 +128,24 @@ ipcMain.on("log:write", (event, message) => {
 });
 
 let win;
-let isOverlayVisible = true;
-let currentMode = "kiosk";
+let isOverlayVisible = false;
+let currentMode = "setup";
 
 function createWindow() {
   win = new BrowserWindow({
-    width: 1920,
-    height: 1080,
+    width: 500,
+    height: 660,
     frame: false,
-    fullscreen: true,
-    kiosk: true,
-    alwaysOnTop: true,
-    skipTaskbar: true,
+    fullscreen: false,
+    kiosk: false,
+    alwaysOnTop: false,
+    skipTaskbar: false,
     focusable: true,
     autoHideMenuBar: true,
     resizable: false,
     minimizable: false,
     closable: false,
+    center: true,
     transparent: true,
     backgroundColor: "#00000000",
     webPreferences: {
@@ -153,8 +154,6 @@ function createWindow() {
     },
   });
 
-  win.setAlwaysOnTop(true, "screen-saver");
-  win.setVisibleOnAllWorkspaces(true);
   win.loadFile(path.join(__dirname, "renderer.html"));
 
   win.on("blur", () => {
@@ -240,6 +239,21 @@ function setHiddenMode() {
   win.hide();
 }
 
+function setSetupMode() {
+  if (!win) return;
+  currentMode = "setup";
+  isOverlayVisible = true;
+  win.setKiosk(false);
+  win.setFullScreen(false);
+  win.setAlwaysOnTop(false);
+  win.setIgnoreMouseEvents(false);
+  win.setSkipTaskbar(false);
+  win.setSize(500, 660);
+  win.center();
+  win.show();
+  win.focus();
+}
+
 ipcMain.on("window:mode", (event, mode) => {
   switch (mode) {
     case "kiosk":
@@ -253,6 +267,9 @@ ipcMain.on("window:mode", (event, mode) => {
       break;
     case "hidden":
       setHiddenMode();
+      break;
+    case "setup":
+      setSetupMode();
       break;
   }
 });
