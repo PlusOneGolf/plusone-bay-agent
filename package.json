@@ -25,6 +25,9 @@
       "config.json",
       "package.json"
     ],
+    "extraResources": [
+      { "from": "nircmd.exe", "to": "nircmd.exe" }
+    ],
     "win": {
       "target": "nsis",
       "icon": null

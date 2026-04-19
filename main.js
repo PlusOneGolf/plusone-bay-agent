@@ -64,10 +64,13 @@ ipcMain.handle("app:config:save", (event, config) => {
   }
 });
 
+function getNircmdPath(cfg) {
+  return cfg.nircmdPath || path.join(process.resourcesPath, "nircmd.exe");
+}
+
 ipcMain.on("display:off", () => {
   const cfg = getLocalConfig();
-  const nircmd = cfg.nircmdPath || "C:\\nircmd\\nircmd.exe";
-  exec(`"${nircmd}" monitor off`);
+  exec(`"${getNircmdPath(cfg)}" monitor off`);
 });
 
 ipcMain.on("display:wake", () => {
