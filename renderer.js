@@ -575,16 +575,16 @@ saveBtn.addEventListener("click", async function () {
     log("localConfig saved " + JSON.stringify(localCfg));
   }
 
-  log("Setup complete — connecting (server will send first command)");
-  setWindowMode("hidden");
+  log("Setup complete — showing lock screen, server will reconcile");
+  launchKiosk();
   connect(serverUrl, bayName, facilityId);
 });
 
 connectBtn.addEventListener("click", function () {
   var bayName    = savedConfig.bayName || savedConfig.bayId;
   var facilityId = savedConfig.facilityId || "";
-  log("Connect clicked — connecting (server will send first command)");
-  setWindowMode("hidden");
+  log("Connect clicked — showing lock screen, server will reconcile");
+  launchKiosk();
   connect(savedConfig.serverUrl, bayName, facilityId);
 });
 
