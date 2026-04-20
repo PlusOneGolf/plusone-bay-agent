@@ -231,12 +231,17 @@ function setHiddenMode() {
   if (!win) return;
   currentMode = "hidden";
   isOverlayVisible = false;
-  win.setIgnoreMouseEvents(false);
+  win.setIgnoreMouseEvents(true);
   win.setAlwaysOnTop(false);
   win.setKiosk(false);
   win.setFullScreen(false);
   win.setSkipTaskbar(false);
-  win.hide();
+  setTimeout(() => {
+    if (currentMode === "hidden" && win) {
+      win.hide();
+      win.setIgnoreMouseEvents(false);
+    }
+  }, 400);
 }
 
 function setSetupMode() {
