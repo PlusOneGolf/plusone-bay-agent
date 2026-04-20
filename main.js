@@ -31,7 +31,17 @@ ipcMain.handle("config:save", (event, config) => {
 
 const DISPLAY_WAKE_CMD = `powershell -Command "Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.Cursor]::Position = [System.Drawing.Point]::new(1,1); Start-Sleep -Milliseconds 100; [System.Windows.Forms.Cursor]::Position = [System.Drawing.Point]::new(0,0)"`;
 
+function getLocalConfigPath() {
+  return path.join(app.getPath("userData"), "bay-local-config.json");
+}
+
 function getLocalConfig() {
+  // Try writable userData file first (survives app updates)
+  try {
+    const data = fs.readFileSync(getLocalConfigPath(), "utf-8");
+    return JSON.parse(data);
+  } catch (e) {}
+  // Fall back to bundled defaults from config.json
   try {
     const data = fs.readFileSync(path.join(__dirname, "config.json"), "utf-8");
     return JSON.parse(data);
@@ -61,8 +71,10 @@ ipcMain.handle("dialog:open-file", async (event, opts) => {
   } finally {
     if (win) {
       if (wasFullscreen) win.setFullScreen(true);
-      if (wasKiosk) win.setKiosk(true);
-      win.setAlwaysOnTop(true, "screen-saver");
+      if (wasKiosk) {
+        win.setKiosk(true);
+        win.setAlwaysOnTop(true, "screen-saver");
+      }
       win.focus();
     }
   }
@@ -73,7 +85,7 @@ ipcMain.handle("app:config:save", (event, config) => {
   try {
     const existing = getLocalConfig();
     const merged = Object.assign({}, existing, config);
-    fs.writeFileSync(path.join(__dirname, "config.json"), JSON.stringify(merged, null, 2), "utf-8");
+    fs.writeFileSync(getLocalConfigPath(), JSON.stringify(merged, null, 2), "utf-8");
     return true;
   } catch (e) {
     return false;
