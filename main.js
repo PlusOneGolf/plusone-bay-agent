@@ -102,7 +102,11 @@ ipcMain.on("display:off", () => {
 });
 
 ipcMain.on("display:wake", () => {
-  exec(DISPLAY_WAKE_CMD);
+  const cfg = getLocalConfig();
+  const nircmd = getNircmdPath(cfg);
+  exec(`"${nircmd}" sendkeypress shift`, (err) => {
+    exec(DISPLAY_WAKE_CMD);
+  });
 });
 
 ipcMain.on("tps:kill", () => {
