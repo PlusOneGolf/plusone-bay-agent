@@ -336,6 +336,11 @@ function handleCommand(data) {
   lastServerSeen = Date.now();
   connected = true;
 
+  if (windowMode === "setup") {
+    log("CMD ignored while setup screen open: " + command);
+    return;
+  }
+
   if (command === "lock") {
     if (payload.reason === "invalid_pin" || payload.reason === "invalid_request") {
       log("CMD lock rejected reason=" + payload.reason);
@@ -521,47 +526,6 @@ function showSetupSummary() {
   render();
 }
 
-var autoConnectIntervalId = null;
-var autoConnectRemaining  = 0;
-var autoConnectServerUrl  = "";
-var autoConnectBayName    = "";
-var autoConnectFacilityId = "";
-
-function updateConnectBtnText() {
-  if (autoConnectRemaining > 0) {
-    connectBtn.textContent = "Connecting in " + autoConnectRemaining + "s\u2026";
-  } else {
-    connectBtn.textContent = "Connect";
-  }
-}
-
-function clearAutoConnect() {
-  if (autoConnectIntervalId) {
-    clearInterval(autoConnectIntervalId);
-    autoConnectIntervalId = null;
-  }
-  autoConnectRemaining = 0;
-  connectBtn.textContent = "Connect";
-}
-
-function startAutoConnect(serverUrl, bayName, facilityId) {
-  autoConnectServerUrl  = serverUrl;
-  autoConnectBayName    = bayName;
-  autoConnectFacilityId = facilityId;
-  autoConnectRemaining  = 3;
-  updateConnectBtnText();
-  autoConnectIntervalId = setInterval(function () {
-    autoConnectRemaining--;
-    updateConnectBtnText();
-    if (autoConnectRemaining <= 0) {
-      clearAutoConnect();
-      log("Auto-connect: launching kiosk");
-      launchKiosk();
-      connect(autoConnectServerUrl, autoConnectBayName, autoConnectFacilityId);
-    }
-  }, 1000);
-}
-
 async function initConfig() {
   localConfig = (await ipcRenderer.invoke("app:config:load")) || {};
   var logPath = await ipcRenderer.invoke("log:path");
@@ -575,9 +539,8 @@ async function initConfig() {
     serverUrlIn.value  = savedConfig.serverUrl;
     bayNameIn.value    = bayName;
     facilityIdIn.value = facilityId;
-    log("Saved config found — showing summary with auto-connect");
+    log("Saved config found — showing summary (waiting for Connect)");
     showSetupSummary();
-    startAutoConnect(savedConfig.serverUrl, bayName, facilityId);
   } else {
     log("No saved config — showing setup form");
     showSetupForm();
@@ -618,7 +581,6 @@ saveBtn.addEventListener("click", async function () {
 });
 
 connectBtn.addEventListener("click", function () {
-  clearAutoConnect();
   var bayName    = savedConfig.bayName || savedConfig.bayId;
   var facilityId = savedConfig.facilityId || "";
   log("Connect clicked — launching kiosk");
@@ -627,7 +589,6 @@ connectBtn.addEventListener("click", function () {
 });
 
 editSettingsBtn.addEventListener("click", function () {
-  clearAutoConnect();
   if (savedConfig) {
     serverUrlIn.value  = savedConfig.serverUrl || "";
     bayNameIn.value    = savedConfig.bayName || savedConfig.bayId || "";
