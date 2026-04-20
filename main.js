@@ -197,8 +197,8 @@ function setTimerBarMode() {
   if (!win) return;
   const display = screen.getPrimaryDisplay();
   const screenWidth = display.workAreaSize.width;
-  const barWidth = 220;
-  const barHeight = 50;
+  const barWidth = 240;
+  const barHeight = 54;
   const xPos = Math.round((screenWidth - barWidth) / 2);
 
   currentMode = "timer";
@@ -207,21 +207,20 @@ function setTimerBarMode() {
   win.setFullScreen(false);
 
   setTimeout(() => {
-    win.setSize(barWidth, barHeight);
-    win.setPosition(xPos, 0);
+    win.setBounds({ x: xPos, y: 0, width: barWidth, height: barHeight });
     win.setAlwaysOnTop(true, "floating");
-    win.setIgnoreMouseEvents(true);
+    win.setIgnoreMouseEvents(true, { forward: true });
     win.setSkipTaskbar(true);
     win.showInactive();
-  }, 250);
+  }, 400);
 }
 
 function setNotifyBarMode() {
   if (!win) return;
   const display = screen.getPrimaryDisplay();
   const screenWidth = display.workAreaSize.width;
-  const barWidth = 420;
-  const barHeight = 48;
+  const barWidth = 440;
+  const barHeight = 52;
   const xPos = Math.round((screenWidth - barWidth) / 2);
 
   currentMode = "notify";
@@ -230,13 +229,12 @@ function setNotifyBarMode() {
   win.setFullScreen(false);
 
   setTimeout(() => {
-    win.setSize(barWidth, barHeight);
-    win.setPosition(xPos, 0);
+    win.setBounds({ x: xPos, y: 0, width: barWidth, height: barHeight });
     win.setAlwaysOnTop(true, "floating");
-    win.setIgnoreMouseEvents(true);
+    win.setIgnoreMouseEvents(true, { forward: true });
     win.setSkipTaskbar(true);
     win.showInactive();
-  }, 250);
+  }, 400);
 }
 
 function setHiddenMode() {
