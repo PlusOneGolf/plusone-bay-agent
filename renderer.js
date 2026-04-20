@@ -374,7 +374,7 @@ function handleCommand(data) {
     cancelDisplayTimers();
     wakeDisplay();
     ipcRenderer.send("tps:launch");
-    doStart(payload.seconds, payload.warn);
+    doStart(payload.secondsRemaining || payload.seconds, payload.warn);
     return;
   }
 
