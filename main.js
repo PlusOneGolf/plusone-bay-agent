@@ -145,8 +145,8 @@ let currentMode = "setup";
 
 function createWindow() {
   win = new BrowserWindow({
-    width: 500,
-    height: 660,
+    width: 780,
+    height: 760,
     frame: false,
     fullscreen: false,
     kiosk: false,
@@ -265,7 +265,7 @@ function setSetupMode() {
   win.setAlwaysOnTop(false);
   win.setIgnoreMouseEvents(false);
   win.setSkipTaskbar(false);
-  win.setSize(500, 660);
+  win.setSize(780, 760);
   win.center();
   win.show();
   win.focus();
@@ -314,8 +314,7 @@ app.on("ready", () => {
   ipcMain.handle("log:path", () => getLogPath());
 
   ipcMain.on("app:quit", () => {
-    if (win) win.removeAllListeners("close");
-    app.quit();
+    app.exit(0);
   });
 });
 
