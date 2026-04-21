@@ -367,7 +367,6 @@ function handleCommand(data) {
     wakeDisplay();
     pinUnlocked = false;
     doUnlock();
-    ipcRenderer.send("tps:launch");
     return;
   }
 
