@@ -52,6 +52,7 @@ let notifyMessage      = null;
 let notifyTimeout      = null;
 let displayOffTimer    = null;
 let displayWakeTimer   = null;
+let prepareReceived    = false;
 let localConfig        = {};
 
 function log(msg) {
@@ -370,10 +371,25 @@ function handleCommand(data) {
     return;
   }
 
-  if (command === "start") {
+  if (command === "prepare") {
+    log("CMD prepare — waking display, unlocking, launching TPS");
     cancelDisplayTimers();
     wakeDisplay();
     ipcRenderer.send("tps:launch");
+    prepareReceived = true;
+    pinUnlocked = false;
+    doUnlock();
+    return;
+  }
+
+  if (command === "start") {
+    log("CMD start prepareReceived=" + prepareReceived);
+    cancelDisplayTimers();
+    if (!prepareReceived) {
+      wakeDisplay();
+      ipcRenderer.send("tps:launch");
+    }
+    prepareReceived = false;
     doStart(payload.secondsRemaining || payload.seconds, payload.warn);
     return;
   }
