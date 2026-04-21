@@ -212,7 +212,7 @@ function setTimerBarMode() {
 
   setTimeout(() => {
     win.setBounds({ x: xPos, y: 0, width: barWidth, height: barHeight });
-    win.setAlwaysOnTop(true, "floating");
+    win.setAlwaysOnTop(true, "screen-saver");
     win.setIgnoreMouseEvents(true, { forward: true });
     win.setSkipTaskbar(true);
     win.showInactive();
@@ -234,7 +234,7 @@ function setNotifyBarMode() {
 
   setTimeout(() => {
     win.setBounds({ x: xPos, y: 0, width: barWidth, height: barHeight });
-    win.setAlwaysOnTop(true, "floating");
+    win.setAlwaysOnTop(true, "screen-saver");
     win.setIgnoreMouseEvents(true, { forward: true });
     win.setSkipTaskbar(true);
     win.showInactive();
