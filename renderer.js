@@ -393,6 +393,18 @@ function handleCommand(data) {
     return;
   }
 
+  if (command === "update") {
+    var updSec = payload.secondsRemaining || payload.seconds;
+    if (updSec) {
+      cancelDisplayTimers();
+      endsAt = Date.now() + updSec * 1000;
+      if (endsAt - Date.now() > 10 * 60 * 1000) { warned = false; }
+      log("CMD update — new endsAt in " + updSec + "s");
+    }
+    render();
+    return;
+  }
+
   if (command === "extend") {
     var extSec = payload.seconds || 900;
     if (endsAt) {
