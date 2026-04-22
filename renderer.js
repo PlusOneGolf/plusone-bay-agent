@@ -53,6 +53,7 @@ let notifyTimeout      = null;
 let displayOffTimer    = null;
 let displayWakeTimer   = null;
 let prepareReceived    = false;
+let manualMode         = false;
 let localConfig        = {};
 
 function log(msg) {
@@ -420,6 +421,24 @@ function handleCommand(data) {
     ipcRenderer.send("tps:kill");
     pinUnlocked = false;
     doLock({});
+    return;
+  }
+
+  if (command === "manual") {
+    log("CMD manual — cancelling automation, locking bay");
+    cancelDisplayTimers();
+    ipcRenderer.send("tps:kill");
+    prepareReceived = false;
+    pinUnlocked = false;
+    manualMode = true;
+    doLock({ nextReservation: null });
+    return;
+  }
+
+  if (command === "resume") {
+    log("CMD resume — automation restored, awaiting reconciler");
+    manualMode = false;
+    wakeDisplay();
     return;
   }
 
