@@ -349,7 +349,14 @@ function handleCommand(data) {
       showPinError("Incorrect code, please try again");
       return;
     }
-    log("CMD lock mode=" + (payload.mode || "transition") + " next=" + JSON.stringify(payload.nextReservation || null));
+    log("CMD lock mode=" + (payload.mode || "transition") + " alreadyLocked=" + !!payload.alreadyLocked + " next=" + JSON.stringify(payload.nextReservation || null));
+
+    if (payload.alreadyLocked) {
+      showNextReservation(payload.nextReservation || null);
+      render();
+      return;
+    }
+
     cancelDisplayTimers();
     ipcRenderer.send("tps:kill");
     pinUnlocked = false;
