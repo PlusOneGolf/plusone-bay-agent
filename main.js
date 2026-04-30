@@ -210,13 +210,17 @@ function setTimerBarMode() {
   win.setKiosk(false);
   win.setFullScreen(false);
 
-  setTimeout(() => {
+  const applyTimerBounds = () => {
+    if (currentMode !== "timer" || !win) return;
     win.setBounds({ x: xPos, y: 0, width: barWidth, height: barHeight });
     win.setAlwaysOnTop(true, "screen-saver");
     win.setIgnoreMouseEvents(true, { forward: true });
     win.setSkipTaskbar(true);
     win.showInactive();
-  }, 400);
+  };
+
+  setTimeout(applyTimerBounds, 600);
+  setTimeout(applyTimerBounds, 1200);
 }
 
 function setNotifyBarMode() {
@@ -233,12 +237,13 @@ function setNotifyBarMode() {
   win.setFullScreen(false);
 
   setTimeout(() => {
+    if (currentMode !== "notify" || !win) return;
     win.setBounds({ x: xPos, y: 0, width: barWidth, height: barHeight });
     win.setAlwaysOnTop(true, "screen-saver");
     win.setIgnoreMouseEvents(true, { forward: true });
     win.setSkipTaskbar(true);
     win.showInactive();
-  }, 400);
+  }, 600);
 }
 
 function setHiddenMode() {
